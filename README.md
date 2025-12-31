@@ -17,7 +17,7 @@ A Claude Code plugin for project-local session diaries with reflection to CLAUDE
 /plugin marketplace add orgoj/orgoj-claude-plugin-project-diary
 
 # Install plugin
-/plugin install project-diary@project-diary
+/plugin install project-diary@project-diary-marketplace
 
 # Restart Claude Code
 ```

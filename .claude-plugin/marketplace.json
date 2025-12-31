@@ -1,12 +1,12 @@
 {
-  "name": "project-diary",
+  "name": "project-diary-marketplace",
   "owner": {
     "name": "orgoj",
     "url": "https://github.com/orgoj/orgoj-claude-plugin-project-diary"
   },
   "metadata": {
     "description": "Project-local session diary with reflection to CLAUDE.md",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "plugins": [
     {
