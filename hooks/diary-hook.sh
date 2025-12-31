@@ -48,14 +48,19 @@ case "$HOOK_EVENT" in
     ;;
 
   "session-start")
-    # Only load diary context after compact (not on fresh start/resume)
+    # Output session ID to context (Claude will see this)
+    echo "<session-info>"
+    echo "SESSION_ID: ${SESSION_ID}"
+    echo "PROJECT: ${CWD}"
+    echo "</session-info>"
+
+    # Load diary context only after compact
     if [ "$SOURCE" = "compact" ]; then
-      # Find diary file for this session
       if [ -d "$DIARY_DIR" ] && [ -n "$SESSION_ID" ]; then
         DIARY_FILE=$(find "$DIARY_DIR" -maxdepth 1 -name "*-${SESSION_ID}.md" -type f 2>/dev/null | head -1)
         if [ -n "$DIARY_FILE" ] && [ -f "$DIARY_FILE" ]; then
           echo "<diary-context>"
-          echo "Previous session diary for session ${SESSION_ID}:"
+          echo "Previous session diary:"
           echo ""
           cat "$DIARY_FILE"
           echo "</diary-context>"

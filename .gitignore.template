@@ -1,4 +1,0 @@
-# Project Diary - add these lines to your project's .gitignore
-# to exclude session diaries from version control
-
-.claude/diary/

@@ -74,15 +74,18 @@ Analyze diary entries and update CLAUDE.md.
 
 | Event | Action |
 |-------|--------|
+| SessionStart | Outputs session ID to context (`<session-info>`) |
+| SessionStart (after compact) | Also loads previous diary into context |
 | PreCompact | Creates diary entry before context compaction |
 | SessionEnd | Creates diary entry when session ends |
-| SessionStart (after compact) | Loads previous diary into context |
 
 ### Data Flow
 
 ```
+SessionStart → outputs SESSION_ID to context
 PreCompact/SessionEnd → hook outputs "/diary FILEPATH" → Claude creates diary
-SessionStart (compact) → hook outputs diary content → Claude has context
+SessionStart (compact) → hook also outputs diary content → Claude has context
+Manual /diary → uses SESSION_ID from context (or generates random)
 ```
 
 ### Pattern Recognition
@@ -110,14 +113,6 @@ your-project/
 
 - Claude Code CLI
 - `jq` (for JSON parsing in hooks)
-
-## Recommended: Add to .gitignore
-
-Copy from `.gitignore.template` or add to your project's `.gitignore`:
-
-```
-.claude/diary/
-```
 
 ## Credits
 

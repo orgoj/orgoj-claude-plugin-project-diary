@@ -9,7 +9,7 @@ You will create a structured diary entry documenting this session.
 ## Parameters
 
 The command accepts an optional filepath parameter:
-- `/diary` - Generate filename automatically: `./.claude/diary/YYYY-MM-DD-HH-MM-RANDOM.md`
+- `/diary` - Generate filename using session ID from context
 - `/diary /path/to/file.md` - Use the specified filepath (from hook)
 
 **$ARGUMENTS**: {{ arguments }}
@@ -18,7 +18,9 @@ The command accepts an optional filepath parameter:
 
 1. If `$ARGUMENTS` contains a filepath (ends with `.md`), use that filepath exactly
 2. If `$ARGUMENTS` is empty or doesn't contain a filepath:
-   - Generate: `./.claude/diary/YYYY-MM-DD-HH-MM-$(head -c 6 /dev/urandom | base64 | tr -dc 'a-z0-9' | head -c 6).md`
+   - Look for `<session-info>SESSION_ID: xxx</session-info>` in conversation context (from SessionStart hook)
+   - If found, generate: `./.claude/diary/YYYY-MM-DD-HH-MM-SESSIONID.md`
+   - If not found, generate random ID: `./.claude/diary/YYYY-MM-DD-HH-MM-RANDOM.md`
    - Create directory if needed: `mkdir -p ./.claude/diary`
 
 ## Approach: Context-First
