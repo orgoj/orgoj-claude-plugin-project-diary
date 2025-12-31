@@ -48,24 +48,35 @@ case "$HOOK_EVENT" in
     ;;
 
   "session-start")
-    # Output session ID to context (Claude will see this)
-    echo "<session-info>"
-    echo "SESSION_ID: ${SESSION_ID}"
-    echo "PROJECT: ${CWD}"
-    echo "</session-info>"
+    # Build context string with XML tags for clear parsing
+    CONTEXT="<session-info>
+SESSION_ID: ${SESSION_ID}
+PROJECT: ${CWD}
+</session-info>"
 
     # Load diary context only after compact
     if [ "$SOURCE" = "compact" ]; then
       if [ -d "$DIARY_DIR" ] && [ -n "$SESSION_ID" ]; then
         DIARY_FILE=$(find "$DIARY_DIR" -maxdepth 1 -name "*-${SESSION_ID}.md" -type f 2>/dev/null | head -1)
         if [ -n "$DIARY_FILE" ] && [ -f "$DIARY_FILE" ]; then
-          echo "<diary-context>"
-          echo "Previous session diary:"
-          echo ""
-          cat "$DIARY_FILE"
-          echo "</diary-context>"
+          DIARY_CONTENT=$(cat "$DIARY_FILE")
+          CONTEXT="${CONTEXT}
+
+<diary-context>
+Previous session diary:
+
+${DIARY_CONTENT}
+</diary-context>"
         fi
       fi
     fi
+
+    # Output JSON format for SessionStart hook using jq for proper escaping
+    jq -n --arg ctx "$CONTEXT" '{
+      hookSpecificOutput: {
+        hookEventName: "SessionStart",
+        additionalContext: $ctx
+      }
+    }'
     ;;
 esac
