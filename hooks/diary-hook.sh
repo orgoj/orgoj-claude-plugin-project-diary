@@ -37,14 +37,19 @@ TIMESTAMP=$(date +%Y-%m-%d-%H-%M)
 FILENAME="${TIMESTAMP}-${SESSION_ID}.md"
 FILEPATH="${DIARY_DIR}/${FILENAME}"
 
+# Get script directory for calling diary-generator.js
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 case "$HOOK_EVENT" in
   "pre-compact"|"session-end")
-    # Ensure diary directory exists
-    mkdir -p "$DIARY_DIR"
+    # Check node dependency
+    if ! command -v node &>/dev/null; then
+      echo "Error: node is required but not installed" >&2
+      exit 1
+    fi
 
-    # Output command for Claude to execute
-    # Hook outputs /diary with the target filename
-    echo "/diary ${FILEPATH}"
+    # Call diary-generator.js with hook data via stdin
+    echo "$HOOK_DATA" | node "${SCRIPT_DIR}/diary-generator.js"
     ;;
 
   "session-start")

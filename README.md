@@ -6,8 +6,8 @@ A Claude Code plugin for project-local session diaries with reflection to CLAUDE
 
 - **Project-local storage**: Diary entries stored in `./.claude/diary/` (not global)
 - **Session ID tracking**: Multiple Claude sessions can run without conflicts
-- **Automatic diary**: Hooks trigger `/diary` on PreCompact and SessionEnd
-- **Context restoration**: After compact, previous diary content is loaded
+- **Automatic diary**: PreCompact/SessionEnd hooks parse transcript and generate diary
+- **Context restoration**: After compact, previous diary content is loaded into context
 - **Intelligent reflection**: `/reflect` analyzes patterns and updates CLAUDE.md
 
 ## Installation
@@ -17,7 +17,7 @@ A Claude Code plugin for project-local session diaries with reflection to CLAUDE
 /plugin marketplace add orgoj/orgoj-claude-plugin-project-diary
 
 # Install plugin
-/plugin install project-diary@project-diary-marketplace
+/plugin install project-diary@orgoj-project-diary
 
 # Restart Claude Code
 ```
@@ -83,10 +83,20 @@ Analyze diary entries and update CLAUDE.md.
 
 ```
 SessionStart → outputs SESSION_ID to context
-PreCompact/SessionEnd → hook outputs "/diary FILEPATH" → Claude creates diary
-SessionStart (compact) → hook also outputs diary content → Claude has context
-Manual /diary → uses SESSION_ID from context (or generates random)
+PreCompact/SessionEnd → hook parses transcript → generates diary markdown
+SessionStart (compact) → loads previous diary into context
+Manual /diary → Claude writes diary (uses SESSION_ID from context)
 ```
+
+### Diary Content (auto-generated)
+
+Extracted from transcript JSONL:
+- **What Was Asked**: User prompts
+- **Task State**: TodoWrite status (completed/in-progress/pending)
+- **Files Modified**: From Edit/Write tool calls
+- **Recent Actions**: Last 10 tool calls with status
+- **Errors**: Bash failures and errors
+- **Last Context**: Last assistant message (truncated)
 
 ### Pattern Recognition
 
@@ -112,16 +122,19 @@ your-project/
 ## Requirements
 
 - Claude Code CLI
-- `jq` (for JSON parsing in hooks)
+- Node.js (for transcript parsing)
+- `jq` (for JSON processing in hooks)
 
 ## Credits
 
-Inspired by [claude-diary](https://github.com/rlancemartin/claude-diary) by rlancemartin.
+Inspired by:
+- [claude-diary](https://github.com/rlancemartin/claude-diary) by rlancemartin
+- [Continuous-Claude-v2](https://github.com/parcadei/Continuous-Claude-v2) - transcript parsing approach
 
-Key differences:
+Key differences from claude-diary:
 - Project-local instead of global storage
 - Session ID in filenames for multi-session support
-- Simplified `/reflect` for single project focus
+- Auto-generated diary from transcript (no Claude call needed)
 - Plugin format (just install, no manual setup)
 
 ## License
