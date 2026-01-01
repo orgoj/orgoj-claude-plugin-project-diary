@@ -37,85 +37,134 @@ function parseTranscript(transcriptPath) {
   let lastAssistant = '';
   const prompts = [];
 
+  // Map tool_use_id to tool call for linking results
+  const toolCallById = new Map();
+
   for (const line of lines) {
     try {
       const entry = JSON.parse(line);
 
+      // JSONL format: entry.type = "user"|"assistant", entry.message.role, entry.message.content
+      const entryType = entry.type;
+      const message = entry.message;
+
+      if (!message) continue;
+
       // Extract user prompts
-      if (entry.role === 'user' && typeof entry.content === 'string') {
-        const prompt = entry.content.substring(0, 200);
-        if (prompt && !prompt.startsWith('<')) { // Skip system messages
-          prompts.push(prompt);
+      // User messages have entry.type === "user" and message.content is string
+      if (entryType === 'user' && message.role === 'user') {
+        const content = message.content;
+        // Skip tool results (content is array with type: "tool_result")
+        if (typeof content === 'string') {
+          const prompt = content.substring(0, 200);
+          if (prompt && !prompt.startsWith('<')) { // Skip system messages
+            prompts.push(prompt);
+          }
         }
       }
 
-      // Extract last assistant message
-      if (entry.role === 'assistant' && typeof entry.content === 'string') {
-        lastAssistant = entry.content;
-      } else if (entry.type === 'assistant' && typeof entry.content === 'string') {
-        lastAssistant = entry.content;
-      }
-
-      // Extract tool calls
-      const toolName = entry.tool_name || (entry.type === 'tool_use' ? entry.name : null);
-      if (toolName) {
-        const toolCall = {
-          name: toolName,
-          timestamp: entry.timestamp,
-          input: entry.tool_input,
-          success: true
-        };
-
-        // Check for TodoWrite to capture state
-        if (toolName === 'TodoWrite') {
-          const input = entry.tool_input;
-          if (input && input.todos) {
-            lastTodoState = input.todos.map((t, idx) => ({
-              id: t.id || `todo-${idx}`,
-              content: t.content || '',
-              status: t.status || 'pending'
-            }));
-          }
-        }
-
-        // Track file modifications from Edit/Write tools
-        if (toolName === 'Edit' || toolName === 'Write') {
-          const filePath = entry.tool_input?.file_path || entry.tool_input?.path;
-          if (filePath && typeof filePath === 'string') {
-            modifiedFiles.add(filePath);
-          }
-        }
-
-        // Track Bash commands
-        if (toolName === 'Bash') {
-          const command = entry.tool_input?.command;
-          if (command) {
-            toolCall.input = { command: command.substring(0, 100) };
-          }
-        }
-
-        allToolCalls.push(toolCall);
-      }
-
-      // Extract tool results and check for failures
-      if (entry.type === 'tool_result' || entry.tool_result !== undefined) {
-        const result = entry.tool_result;
-        if (result) {
-          const exitCode = result.exit_code ?? result.exitCode;
-          if (exitCode !== undefined && exitCode !== 0) {
-            if (allToolCalls.length > 0) {
-              allToolCalls[allToolCalls.length - 1].success = false;
+      // Extract assistant messages and tool calls
+      // Assistant messages have entry.type === "assistant" and message.content is array
+      if (entryType === 'assistant' && message.role === 'assistant') {
+        const content = message.content;
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            // Text blocks - track last assistant text
+            if (block.type === 'text' && typeof block.text === 'string') {
+              lastAssistant = block.text;
             }
-            const errorMsg = result.stderr || result.error || 'Command failed';
-            const lastTool = allToolCalls[allToolCalls.length - 1];
-            const command = lastTool?.input?.command || 'unknown';
-            errors.push(`${command}: ${errorMsg.substring(0, 150)}`);
+
+            // Tool use blocks
+            if (block.type === 'tool_use') {
+              const toolName = block.name;
+              const toolInput = block.input || {};
+              const toolId = block.id;
+
+              const toolCall = {
+                name: toolName,
+                timestamp: entry.timestamp,
+                input: toolInput,
+                success: true,
+                id: toolId
+              };
+
+              // Track by ID for linking results
+              if (toolId) {
+                toolCallById.set(toolId, toolCall);
+              }
+
+              // Check for TodoWrite to capture state
+              if (toolName === 'TodoWrite') {
+                if (toolInput && toolInput.todos) {
+                  lastTodoState = toolInput.todos.map((t, idx) => ({
+                    id: t.id || `todo-${idx}`,
+                    content: t.content || '',
+                    status: t.status || 'pending'
+                  }));
+                }
+              }
+
+              // Track file modifications from Edit/Write tools
+              if (toolName === 'Edit' || toolName === 'Write') {
+                const filePath = toolInput.file_path || toolInput.path;
+                if (filePath && typeof filePath === 'string') {
+                  modifiedFiles.add(filePath);
+                }
+              }
+
+              // Track Bash commands (truncate for readability)
+              if (toolName === 'Bash') {
+                const command = toolInput.command;
+                if (command) {
+                  toolCall.input = { command: command.substring(0, 100) };
+                }
+              }
+
+              allToolCalls.push(toolCall);
+            }
           }
         }
-        if (entry.error) {
-          errors.push(entry.error.substring(0, 150));
-          if (allToolCalls.length > 0) {
-            allToolCalls[allToolCalls.length - 1].success = false;
+      }
+
+      // Extract tool results (come as user messages with array content)
+      if (entryType === 'user' && message.role === 'user' && Array.isArray(message.content)) {
+        for (const block of message.content) {
+          if (block.type === 'tool_result') {
+            const toolId = block.tool_use_id;
+            const resultContent = block.content;
+
+            // Link to original tool call
+            const originalCall = toolId ? toolCallById.get(toolId) : null;
+
+            // Check for errors in result
+            if (Array.isArray(resultContent)) {
+              for (const item of resultContent) {
+                if (item.type === 'text' && typeof item.text === 'string') {
+                  const text = item.text.toLowerCase();
+                  if (text.includes('error') || text.includes('failed') || text.includes('exit code')) {
+                    if (originalCall) {
+                      originalCall.success = false;
+                    }
+                    const errorMsg = item.text.substring(0, 150);
+                    errors.push(errorMsg);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Also check toolUseResult field (alternative location)
+      if (entry.toolUseResult) {
+        const results = Array.isArray(entry.toolUseResult) ? entry.toolUseResult : [entry.toolUseResult];
+        for (const result of results) {
+          if (result.type === 'text' && typeof result.text === 'string') {
+            const text = result.text.toLowerCase();
+            if (text.includes('error') || text.includes('failed')) {
+              const errorMsg = result.text.substring(0, 150);
+              errors.push(errorMsg);
+            }
           }
         }
       }

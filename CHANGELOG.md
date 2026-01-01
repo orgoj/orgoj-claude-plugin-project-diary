@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-01-01
+
+### Fixed
+- Transcript parser now correctly matches JSONL structure
+- User prompts extracted from `entry.type === "user"` with `entry.message.content`
+- Tool calls extracted from `entry.message.content[].type === "tool_use"`
+- Previously diary was empty because parser looked for wrong field names
+
 ## [1.3.0] - 2026-01-01
 
 ### Added

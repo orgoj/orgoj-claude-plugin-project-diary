@@ -1,6 +1,6 @@
 {
   "name": "project-diary",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Project-local diary for Claude Code sessions with reflection to CLAUDE.md",
   "author": {"name": "orgoj"},
   "repository": "https://github.com/orgoj/orgoj-claude-plugin-project-diary"
