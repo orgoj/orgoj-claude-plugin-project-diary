@@ -16,6 +16,7 @@ hooks/
 
 commands/
 ├── diary.md             # /diary skill - manual session documentation
+├── diary-config.md      # /diary-config skill - configure recovery settings
 └── reflect.md           # /reflect skill - pattern analysis and CLAUDE.md updates
 ```
 
@@ -42,6 +43,31 @@ Parses Claude Code's JSONL transcript format:
 | Manual Diary | `.claude/diary/` | `/diary` command |
 | Processed Diary | `.claude/diary/processed/` | `/reflect` command (moved after analysis) |
 | Reflections | `.claude/diary/reflections/` | `/reflect` command |
+| Config | `.claude/diary/.config.json` | `/diary-config` command |
+
+### Configuration
+
+Recovery generator can be configured via `.claude/diary/.config.json`:
+
+```json
+{
+  "recovery": {
+    "minActivity": 1,
+    "limits": {
+      "userPrompts": 5,
+      "promptLength": 150,
+      "toolCalls": 10,
+      "lastMessageLength": 500,
+      "errors": 5
+    }
+  }
+}
+```
+
+- **minActivity**: Minimum activity score (prompts + toolCalls + files + todos) to generate recovery. Sessions below this threshold are skipped.
+- **limits**: Control how much data is saved in recovery files.
+
+Use `/diary-config` to create config interactively.
 
 ## Development
 

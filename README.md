@@ -10,6 +10,7 @@ A Claude Code plugin for project-local session diaries with reflection to CLAUDE
 - **Context restoration**: After compact, previous recovery content is loaded into context
 - **Manual diary**: `/diary` command for structured session documentation
 - **Intelligent reflection**: `/reflect` analyzes patterns and updates CLAUDE.md
+- **Configurable recovery**: `/diary-config` to customize recovery limits and skip empty sessions
 
 ## Installation
 
@@ -76,6 +77,18 @@ Analyze diary entries and update CLAUDE.md.
 /reflect reprocess 2025-01-01-10-30-abc123.md
 ```
 
+### /diary-config
+
+Configure recovery generator settings interactively.
+
+```bash
+/diary-config
+```
+
+Creates `.claude/diary/.config.json` with settings for:
+- **minActivity**: Skip sessions with low activity (default: 1)
+- **limits**: How much data to save (prompts, tool calls, errors, etc.)
+
 ## How It Works
 
 ### Hooks
@@ -126,9 +139,11 @@ Extracted from transcript JSONL:
 your-project/
 ├── .claude/
 │   └── diary/
-│       ├── 2025-12-31-14-30-abc123.md    # Manual diary (/diary command)
+│       ├── .config.json                   # Optional config (/diary-config)
+│       ├── 2025-12-31-14-30-abc123.md     # Manual diary (/diary command)
 │       ├── 2025-12-31-16-45-def456.md
-│       ├── processed.log                  # Tracks analyzed entries
+│       ├── processed/                     # Analyzed entries (moved by /reflect)
+│       │   └── 2025-12-31-14-30-abc123.md
 │       ├── recovery/                      # Auto-generated (hooks)
 │       │   ├── 2025-12-31-14-00-abc123.md
 │       │   └── 2025-12-31-16-00-def456.md

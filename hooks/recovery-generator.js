@@ -10,10 +10,58 @@ const fs = require('fs');
 const path = require('path');
 
 // ============================================================================
+// Configuration
+// ============================================================================
+
+const DEFAULTS = {
+  minActivity: 1,
+  limits: {
+    userPrompts: 5,
+    promptLength: 150,
+    toolCalls: 10,
+    lastMessageLength: 500,
+    errors: 5
+  }
+};
+
+function findProjectRoot(startDir) {
+  let dir = startDir;
+
+  while (dir !== path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, '.claude'))) {
+      return dir;
+    }
+    dir = path.dirname(dir);
+  }
+
+  return startDir;
+}
+
+function loadConfig(projectRoot) {
+  const configPath = path.join(projectRoot, '.claude', 'diary', '.config.json');
+
+  if (!fs.existsSync(configPath)) {
+    return DEFAULTS;
+  }
+
+  try {
+    const userConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const recovery = userConfig.recovery || {};
+
+    return {
+      minActivity: recovery.minActivity ?? DEFAULTS.minActivity,
+      limits: { ...DEFAULTS.limits, ...recovery.limits }
+    };
+  } catch {
+    return DEFAULTS;
+  }
+}
+
+// ============================================================================
 // Transcript Parsing
 // ============================================================================
 
-function parseTranscript(transcriptPath) {
+function parseTranscript(transcriptPath, limits = DEFAULTS.limits) {
   const summary = {
     lastTodos: [],
     recentToolCalls: [],
@@ -56,7 +104,7 @@ function parseTranscript(transcriptPath) {
         const content = message.content;
         // Skip tool results (content is array with type: "tool_result")
         if (typeof content === 'string') {
-          const prompt = content.substring(0, 200);
+          const prompt = content.substring(0, limits.promptLength);
           if (prompt && !prompt.startsWith('<')) { // Skip system messages
             prompts.push(prompt);
           }
@@ -176,11 +224,11 @@ function parseTranscript(transcriptPath) {
   }
 
   summary.lastTodos = lastTodoState;
-  summary.recentToolCalls = allToolCalls.slice(-10);
-  summary.lastAssistantMessage = lastAssistant.substring(0, 500);
+  summary.recentToolCalls = allToolCalls.slice(-limits.toolCalls);
+  summary.lastAssistantMessage = lastAssistant.substring(0, limits.lastMessageLength);
   summary.filesModified = Array.from(modifiedFiles);
-  summary.errorsEncountered = errors.slice(-5);
-  summary.userPrompts = prompts.slice(-5);
+  summary.errorsEncountered = errors.slice(-limits.errors);
+  summary.userPrompts = prompts.slice(-limits.userPrompts);
 
   return summary;
 }
@@ -189,7 +237,7 @@ function parseTranscript(transcriptPath) {
 // Recovery Generation
 // ============================================================================
 
-function generateRecovery(summary, sessionId, trigger) {
+function generateRecovery(summary, sessionId, trigger, limits = DEFAULTS.limits) {
   const timestamp = new Date().toISOString();
   const lines = [];
 
@@ -295,7 +343,7 @@ function generateRecovery(summary, sessionId, trigger) {
     lines.push('');
     lines.push('```');
     lines.push(summary.lastAssistantMessage);
-    if (summary.lastAssistantMessage.length >= 500) {
+    if (summary.lastAssistantMessage.length >= limits.lastMessageLength) {
       lines.push('[... truncated]');
     }
     lines.push('```');
@@ -337,14 +385,29 @@ function main() {
     process.exit(1);
   }
 
+  // Find project root and load config
+  const projectRoot = findProjectRoot(cwd);
+  const config = loadConfig(projectRoot);
+
   // Parse transcript
-  const summary = parseTranscript(transcriptPath);
+  const summary = parseTranscript(transcriptPath, config.limits);
+
+  // Check activity threshold
+  const activity = summary.userPrompts.length
+                 + summary.recentToolCalls.length
+                 + summary.filesModified.length
+                 + summary.lastTodos.length;
+
+  if (activity < config.minActivity) {
+    console.log(`Skipping recovery: activity ${activity} < minActivity ${config.minActivity}`);
+    process.exit(0);
+  }
 
   // Generate recovery markdown
-  const recovery = generateRecovery(summary, sessionId, trigger);
+  const recovery = generateRecovery(summary, sessionId, trigger, config.limits);
 
   // Create recovery directory
-  const recoveryDir = path.join(cwd, '.claude', 'diary', 'recovery');
+  const recoveryDir = path.join(projectRoot, '.claude', 'diary', 'recovery');
   if (!fs.existsSync(recoveryDir)) {
     fs.mkdirSync(recoveryDir, { recursive: true });
   }

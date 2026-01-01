@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-01-01
+
+### Added
+- `/diary-config` command for interactive configuration of recovery settings
+- Configurable recovery limits via `.claude/diary/.config.json`
+- `minActivity` threshold to skip empty/minimal sessions (default: 1)
+- Configurable limits for: userPrompts, promptLength, toolCalls, lastMessageLength, errors
+- `findProjectRoot()` to correctly locate config regardless of cwd
+
+### Changed
+- Recovery generator now reads config from project root, not cwd
+- All hardcoded limits replaced with configurable values
+
 ## [1.6.0] - 2026-01-01
 
 ### Changed
