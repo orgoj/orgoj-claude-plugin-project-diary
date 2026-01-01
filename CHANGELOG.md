@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-01-01
+
+### Changed
+- **BREAKING**: Separated auto-generated context recovery from manual diary
+- Renamed `diary-generator.js` to `recovery-generator.js`
+- Recovery files now stored in `.claude/diary/recovery/` (was `.claude/diary/`)
+- SessionStart loads `<recovery-context>` instead of `<diary-context>`
+
+### Added
+- `/reflect include recovery` parameter to optionally analyze recovery files
+- Clear documentation distinguishing recovery (auto) vs diary (manual)
+
+### Migration
+- Existing `.claude/diary/*.md` files created by hooks will not be moved automatically
+- New recovery files will be created in `.claude/diary/recovery/`
+
 ## [1.3.2] - 2026-01-01
 
 ### Fixed

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Diary Generator - Pure JavaScript transcript parser
+ * Recovery Generator - Pure JavaScript transcript parser
  *
- * Parses Claude Code JSONL transcripts and generates session diary markdown.
- * Inspired by Continuous-Claude-v2 transcript-parser.
+ * Parses Claude Code JSONL transcripts and generates session recovery markdown.
+ * Used for context restoration after compact. Inspired by Continuous-Claude-v2.
  */
 
 const fs = require('fs');
@@ -186,10 +186,10 @@ function parseTranscript(transcriptPath) {
 }
 
 // ============================================================================
-// Diary Generation
+// Recovery Generation
 // ============================================================================
 
-function generateDiary(summary, sessionId, trigger) {
+function generateRecovery(summary, sessionId, trigger) {
   const timestamp = new Date().toISOString();
   const lines = [];
 
@@ -202,7 +202,7 @@ function generateDiary(summary, sessionId, trigger) {
   lines.push('');
 
   // Header
-  lines.push('# Session Diary');
+  lines.push('# Session Recovery');
   lines.push('');
 
   // User Prompts (what was asked)
@@ -340,34 +340,34 @@ function main() {
   // Parse transcript
   const summary = parseTranscript(transcriptPath);
 
-  // Generate diary markdown
-  const diary = generateDiary(summary, sessionId, trigger);
+  // Generate recovery markdown
+  const recovery = generateRecovery(summary, sessionId, trigger);
 
-  // Create diary directory
-  const diaryDir = path.join(cwd, '.claude', 'diary');
-  if (!fs.existsSync(diaryDir)) {
-    fs.mkdirSync(diaryDir, { recursive: true });
+  // Create recovery directory
+  const recoveryDir = path.join(cwd, '.claude', 'diary', 'recovery');
+  if (!fs.existsSync(recoveryDir)) {
+    fs.mkdirSync(recoveryDir, { recursive: true });
   }
 
   // Generate filename
   const now = new Date();
   const timestamp = now.toISOString().slice(0, 16).replace('T', '-').replace(':', '-');
   const filename = `${timestamp}-${sessionId}.md`;
-  const filepath = path.join(diaryDir, filename);
+  const filepath = path.join(recoveryDir, filename);
 
   // Check if file exists (from previous compact in same session)
   // If so, append instead of overwrite
   if (fs.existsSync(filepath)) {
     const separator = '\n\n---\n\n# Session Continued\n\n';
     const existingContent = fs.readFileSync(filepath, 'utf-8');
-    // Remove frontmatter from new diary for append
-    const diaryWithoutFrontmatter = diary.replace(/^---[\s\S]*?---\n\n/, '');
-    fs.writeFileSync(filepath, existingContent + separator + diaryWithoutFrontmatter);
+    // Remove frontmatter from new recovery for append
+    const recoveryWithoutFrontmatter = recovery.replace(/^---[\s\S]*?---\n\n/, '');
+    fs.writeFileSync(filepath, existingContent + separator + recoveryWithoutFrontmatter);
   } else {
-    fs.writeFileSync(filepath, diary);
+    fs.writeFileSync(filepath, recovery);
   }
 
-  console.log(`Diary saved: ${filepath}`);
+  console.log(`Recovery saved: ${filepath}`);
 }
 
 main();

@@ -37,7 +37,7 @@ TIMESTAMP=$(date +%Y-%m-%d-%H-%M)
 FILENAME="${TIMESTAMP}-${SESSION_ID}.md"
 FILEPATH="${DIARY_DIR}/${FILENAME}"
 
-# Get script directory for calling diary-generator.js
+# Get script directory for calling recovery-generator.js
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 case "$HOOK_EVENT" in
@@ -48,8 +48,8 @@ case "$HOOK_EVENT" in
       exit 1
     fi
 
-    # Call diary-generator.js with hook data via stdin
-    echo "$HOOK_DATA" | node "${SCRIPT_DIR}/diary-generator.js"
+    # Call recovery-generator.js with hook data via stdin
+    echo "$HOOK_DATA" | node "${SCRIPT_DIR}/recovery-generator.js"
     ;;
 
   "session-start")
@@ -59,20 +59,21 @@ SESSION_ID: ${SESSION_ID}
 PROJECT: ${CWD}
 </session-info>"
 
-    # Load diary context only after compact
+    # Load recovery context only after compact
+    RECOVERY_DIR="${DIARY_DIR}/recovery"
     if [ "$SOURCE" = "compact" ]; then
-      if [ -d "$DIARY_DIR" ] && [ -n "$SESSION_ID" ]; then
-        # Get newest diary file for this session (sorted by name desc = newest timestamp first)
-        DIARY_FILE=$(find "$DIARY_DIR" -maxdepth 1 -name "*-${SESSION_ID}.md" -type f 2>/dev/null | sort -r | head -1)
-        if [ -n "$DIARY_FILE" ] && [ -f "$DIARY_FILE" ]; then
-          DIARY_CONTENT=$(cat "$DIARY_FILE")
+      if [ -d "$RECOVERY_DIR" ] && [ -n "$SESSION_ID" ]; then
+        # Get newest recovery file for this session (sorted by name desc = newest timestamp first)
+        RECOVERY_FILE=$(find "$RECOVERY_DIR" -maxdepth 1 -name "*-${SESSION_ID}.md" -type f 2>/dev/null | sort -r | head -1)
+        if [ -n "$RECOVERY_FILE" ] && [ -f "$RECOVERY_FILE" ]; then
+          RECOVERY_CONTENT=$(cat "$RECOVERY_FILE")
           CONTEXT="${CONTEXT}
 
-<diary-context>
-Previous session diary:
+<recovery-context>
+Previous session recovery:
 
-${DIARY_CONTENT}
-</diary-context>"
+${RECOVERY_CONTENT}
+</recovery-context>"
         fi
       fi
     fi

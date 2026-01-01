@@ -19,17 +19,19 @@ Parse the following from `$ARGUMENTS`:
 | `last N days` | `last 7 days` | Entries from last N days |
 | `related to KEYWORD` | `related to testing` | Filter by keyword in content |
 | `include processed` | `include processed` | Re-analyze already processed entries |
+| `include recovery` | `include recovery` | Include auto-generated recovery files from `recovery/` |
 | `reprocess FILENAME` | `reprocess 2025-01-01-10-30-abc123.md` | Re-analyze specific entry |
 
 **Examples:**
 ```
-/reflect                              # Last 10 unprocessed entries
+/reflect                              # Last 10 unprocessed manual diary entries
 /reflect last 20 entries              # Last 20 unprocessed entries
 /reflect from 2025-01-01 to 2025-01-15
 /reflect last 7 days
 /reflect related to React
 /reflect last 5 entries related to testing
 /reflect include processed            # Include already-analyzed entries
+/reflect include recovery             # Include auto-generated recovery files
 /reflect reprocess 2025-01-01-10-30-abc123.md
 ```
 
@@ -44,9 +46,17 @@ Read `./.claude/diary/processed.log` to find already-analyzed entries:
 
 ### Step 2: List diary entries
 
+**Default** (manual diary entries only):
 ```bash
 ls -1 ./.claude/diary/*.md 2>/dev/null | sort -r
 ```
+
+**With `include recovery`** (also include auto-generated recovery files):
+```bash
+ls -1 ./.claude/diary/*.md ./.claude/diary/recovery/*.md 2>/dev/null | sort -r
+```
+
+Note: Manual diary entries (from `/diary` command) are in `.claude/diary/`. Auto-generated recovery files (from hooks) are in `.claude/diary/recovery/`.
 
 ### Step 3: Filter entries
 
