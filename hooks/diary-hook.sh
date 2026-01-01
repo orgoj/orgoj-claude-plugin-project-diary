@@ -62,7 +62,8 @@ PROJECT: ${CWD}
     # Load diary context only after compact
     if [ "$SOURCE" = "compact" ]; then
       if [ -d "$DIARY_DIR" ] && [ -n "$SESSION_ID" ]; then
-        DIARY_FILE=$(find "$DIARY_DIR" -maxdepth 1 -name "*-${SESSION_ID}.md" -type f 2>/dev/null | head -1)
+        # Get newest diary file for this session (sorted by name desc = newest timestamp first)
+        DIARY_FILE=$(find "$DIARY_DIR" -maxdepth 1 -name "*-${SESSION_ID}.md" -type f 2>/dev/null | sort -r | head -1)
         if [ -n "$DIARY_FILE" ] && [ -f "$DIARY_FILE" ]; then
           DIARY_CONTENT=$(cat "$DIARY_FILE")
           CONTEXT="${CONTEXT}

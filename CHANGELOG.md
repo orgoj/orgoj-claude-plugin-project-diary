@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.2] - 2026-01-01
+
+### Fixed
+- SessionStart after compact now loads newest diary (was loading first alphabetically)
+- Added `sort -r` to get most recent diary file when multiple exist for same session
+
 ## [1.3.1] - 2026-01-01
 
 ### Fixed
