@@ -119,6 +119,7 @@ Manual /diary → Claude writes diary (uses SESSION_ID from context)
 ### Recovery Content (auto-generated)
 
 Extracted from transcript JSONL:
+- **Quick Insights**: Main task, status, activity stats, error count (at top for rapid context)
 - **What Was Asked**: User prompts
 - **Task State**: TodoWrite status (completed/in-progress/pending)
 - **Files Modified**: From Edit/Write tool calls

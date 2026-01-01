@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-01-01
+
+### Added
+- **Quick Insights** section at the start of recovery files for rapid context understanding
+- Displays main task, status (In Progress/Completed), activity stats, and error count
+- Helps Claude quickly grasp session state after context compaction without reading entire recovery
+
 ## [1.7.0] - 2026-01-01
 
 ### Added

@@ -100,3 +100,4 @@ echo '{"session_id":"test123","cwd":"/tmp","transcript_path":"/path/to/transcrip
 - skills: read description carefully before invoking, match to actual task
 - commits: conventional format (feat:, fix:, chore:) with English messages
 - push: wait for explicit user confirmation before pushing
+- worktrees: do NOT use git worktrees for this project - work directly on master

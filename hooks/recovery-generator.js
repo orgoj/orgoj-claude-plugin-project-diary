@@ -230,6 +230,11 @@ function parseTranscript(transcriptPath, limits = DEFAULTS.limits) {
   summary.errorsEncountered = errors.slice(-limits.errors);
   summary.userPrompts = prompts.slice(-limits.userPrompts);
 
+  // Quick Insights data
+  summary.mainTask = prompts.length > 0 ? prompts[0] : 'No user prompts';
+  summary.incompleteTodos = lastTodoState.filter(t => t.status === 'pending' || t.status === 'in_progress').length;
+  summary.totalTodos = lastTodoState.length;
+
   return summary;
 }
 
@@ -251,6 +256,40 @@ function generateRecovery(summary, sessionId, trigger, limits = DEFAULTS.limits)
 
   // Header
   lines.push('# Session Recovery');
+  lines.push('');
+
+  // Quick Insights
+  lines.push('## Quick Insights');
+  lines.push('');
+
+  // Main Task
+  const taskPreview = summary.mainTask.length > 80
+    ? summary.mainTask.substring(0, 80) + '...'
+    : summary.mainTask;
+  lines.push(`**Main Task**: ${taskPreview}`);
+  lines.push('');
+
+  // Status
+  let status = 'No Activity';
+  if (summary.totalTodos > 0) {
+    status = summary.incompleteTodos > 0 ? 'In Progress' : 'Completed';
+  }
+  lines.push(`**Status**: ${status}`);
+  lines.push('');
+
+  // Activity stats
+  lines.push(`**Activity**: ${summary.userPrompts.length} prompts, ` +
+             `${summary.filesModified.length} files, ` +
+             `${summary.totalTodos} todos`);
+  lines.push('');
+
+  // Errors
+  if (summary.errorsEncountered.length > 0) {
+    lines.push(`**Errors**: ${summary.errorsEncountered.length} encountered`);
+    lines.push('');
+  }
+
+  lines.push('---');
   lines.push('');
 
   // User Prompts (what was asked)
