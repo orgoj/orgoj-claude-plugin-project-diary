@@ -39,6 +39,13 @@ Create a diary entry from the current session.
 
 **Diary location**: `./.claude/diary/YYYY-MM-DD-HH-MM-SESSIONID.md`
 
+**Diary sections**:
+- Task Summary, Work Done, Design Decisions
+- Challenges & Solutions
+- **Mistakes & Corrections** - what went wrong, where user corrected Claude
+- **Lessons Learned** - technical/process insights to remember
+- User Preferences, Code Patterns, Notes
+
 ### /reflect [PARAMS]
 
 Analyze diary entries and update CLAUDE.md.

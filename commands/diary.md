@@ -64,6 +64,32 @@ Create a markdown file with this structure:
 |-----------|----------|
 | Problem 1 | How it was solved |
 
+## Mistakes & Corrections
+[CRITICAL: Be honest about what went wrong]
+
+### Where I Made Errors:
+- [What I did wrong and how the user corrected me]
+- [Misunderstandings, wrong assumptions, incorrect approaches]
+- [Commands/code that failed and why]
+
+### What Caused the Mistakes:
+- [Root cause analysis - missing context, wrong assumption, etc.]
+
+## Lessons Learned
+[CRITICAL: Capture insights that should be remembered for future sessions]
+
+### Technical Lessons:
+- [New patterns, APIs, or techniques discovered]
+- [Project-specific conventions learned]
+
+### Process Lessons:
+- [Better approaches to similar problems]
+- [What to do differently next time]
+
+### To Remember for CLAUDE.md:
+- [Insights worth adding to project memory]
+- [User preferences not yet documented]
+
 ## User Preferences Observed
 [CRITICAL: Document ALL preferences - commits, testing, code style]
 

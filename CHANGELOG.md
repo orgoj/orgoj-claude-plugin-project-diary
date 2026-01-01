@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-01-01
+
+### Added
+- `/diary` now includes "Mistakes & Corrections" section for honest error tracking
+- `/diary` now includes "Lessons Learned" section with technical/process lessons
+- New subsection "To Remember for CLAUDE.md" for capturing insights to persist
+
 ## [1.4.0] - 2026-01-01
 
 ### Changed
