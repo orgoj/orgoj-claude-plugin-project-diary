@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-01-01
+
+### Changed
+- **BREAKING**: Replaced `processed.log` with `processed/` directory
+- Processed diary entries are now moved to `.claude/diary/processed/` after reflection
+- Simplified tracking: unprocessed = `diary/*.md`, processed = `diary/processed/*.md`
+
+### Added
+- `include all processed` parameter to re-analyze all processed entries
+- `include processed PATTERN` parameter to re-analyze matching processed entries
+
+### Removed
+- `processed.log` file no longer used
+- `reprocess FILENAME` parameter (just move file back to diary/ manually)
+- `include processed` without argument (use `include all processed` instead)
+
 ## [1.5.0] - 2026-01-01
 
 ### Added

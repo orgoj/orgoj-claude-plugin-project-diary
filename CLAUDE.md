@@ -40,7 +40,7 @@ Parses Claude Code's JSONL transcript format:
 |------|----------|--------------|
 | Recovery | `.claude/diary/recovery/` | Hooks (automatic) |
 | Manual Diary | `.claude/diary/` | `/diary` command |
-| Processed Log | `.claude/diary/processed.log` | `/reflect` command |
+| Processed Diary | `.claude/diary/processed/` | `/reflect` command (moved after analysis) |
 | Reflections | `.claude/diary/reflections/` | `/reflect` command |
 
 ## Development
