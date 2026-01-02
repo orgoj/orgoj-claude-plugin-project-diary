@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2026-01-02
+
+### Changed
+- Reflection filename format now uses full timestamp: `YYYY-MM-DD-HH-MM-reflection-N.md`
+- Prevents filename collisions when running multiple reflections per day
+- Previous format `YYYY-MM-reflection-N.md` could overwrite earlier reflections
+
+### Fixed
+- Replaced `mkdir -p` with directory existence checks in all commands
+- Commands now check directory existence with Glob/Read tools before creating
+- Eliminates unnecessary confirmation prompts for directory creation
+- Affected commands: `/diary`, `/diary-config`, `/reflect`
+
 ## [1.8.0] - 2026-01-01
 
 ### Added

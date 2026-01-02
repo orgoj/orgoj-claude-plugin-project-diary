@@ -1,6 +1,6 @@
 {
   "name": "project-diary",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Project-local diary for Claude Code sessions with reflection to CLAUDE.md",
   "author": {
     "name": "orgoj"

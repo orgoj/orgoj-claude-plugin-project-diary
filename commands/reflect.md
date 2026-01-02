@@ -98,7 +98,12 @@ Read `./CLAUDE.md` to:
 
 ### Step 6: Generate reflection document
 
-Save to `./.claude/diary/reflections/YYYY-MM-reflection-N.md`:
+Check if `.claude/diary/reflections/` exists using Glob, then create directory only if needed:
+```bash
+mkdir ./.claude/diary/reflections
+```
+
+Save to `./.claude/diary/reflections/YYYY-MM-DD-HH-MM-reflection-N.md`:
 
 ```markdown
 # Reflection: [Date Range or "Last N Entries"]
@@ -166,7 +171,7 @@ Save to `./.claude/diary/reflections/YYYY-MM-reflection-N.md`:
 
 Move analyzed diary entries (not recovery files) to `processed/`:
 ```bash
-mkdir -p ./.claude/diary/processed
+mkdir ./.claude/diary/processed
 mv ./.claude/diary/FILENAME ./.claude/diary/processed/
 ```
 

@@ -56,8 +56,9 @@ Activity score = prompts + toolCalls + filesModified + todos
      - 10
 
 3. **Write config file**:
+   Check if `.claude/diary/` exists using Glob, then create directory only if needed:
    ```bash
-   mkdir -p .claude/diary
+   mkdir .claude/diary
    ```
 
    Write `.claude/diary/.config.json`:

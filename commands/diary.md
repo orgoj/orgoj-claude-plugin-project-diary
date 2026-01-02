@@ -21,7 +21,7 @@ The command accepts an optional filepath parameter:
    - Look for `<session-info>SESSION_ID: xxx</session-info>` in conversation context (from SessionStart hook)
    - If found, generate: `./.claude/diary/YYYY-MM-DD-HH-MM-SESSIONID.md`
    - If not found, generate random ID: `./.claude/diary/YYYY-MM-DD-HH-MM-RANDOM.md`
-   - Create directory if needed: `mkdir -p ./.claude/diary`
+   - Create directory if needed: First check with `Glob ./.claude/diary/*.md`, then `mkdir ./.claude/diary` only if directory doesn't exist
 
 ## Approach: Context-First
 
@@ -112,7 +112,7 @@ Create a markdown file with this structure:
 ## Steps
 
 1. **Determine filepath**: Check `$ARGUMENTS` for provided path or generate new one
-2. **Create directory**: `mkdir -p ./.claude/diary` if needed
+2. **Create directory**: Check if `.claude/diary/` exists using Glob, then `mkdir ./.claude/diary` only if needed
 3. **Gather context**: Review conversation history
 4. **Get git branch**: Run `git branch --show-current 2>/dev/null || echo "unknown"`
 5. **Write diary**: Use Write tool to save the diary entry

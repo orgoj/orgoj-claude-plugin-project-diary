@@ -149,7 +149,7 @@ your-project/
 │       │   ├── 2025-12-31-14-00-abc123.md
 │       │   └── 2025-12-31-16-00-def456.md
 │       └── reflections/
-│           └── 2025-12-reflection-1.md    # Reflection documents
+│           └── 2025-12-31-14-30-reflection-1.md    # Reflection documents
 └── CLAUDE.md                              # Updated by /reflect
 ```
 
