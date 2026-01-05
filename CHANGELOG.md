@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.11.0] - 2026-01-05
+
+### Fixed
+- **Idle time detection now enabled by default** - previously required explicit config
+- Changed `idleTime.enabled` default from `false` to `true`
+- Feature now works out-of-the-box without requiring `/diary-config`
+- Can be disabled by setting `idleTime.enabled: false` in config
+- Gracefully handles missing config file (no silent failures)
+
 ## [1.10.0] - 2026-01-05
 
 ### Added

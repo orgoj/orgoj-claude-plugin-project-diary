@@ -47,16 +47,14 @@ case "$COMMAND" in
 
   "prompt")
     CONFIG_FILE="${PROJECT_ROOT}/.claude/diary/.config.json"
-    if [ ! -f "$CONFIG_FILE" ]; then
-      exit 0
-    fi
 
-    ENABLED=$(jq -r '.idleTime.enabled // false' "$CONFIG_FILE")
+    # Default: enabled=true, threshold=5
+    ENABLED=$(jq -r '.idleTime.enabled // true' "$CONFIG_FILE" 2>/dev/null || echo "true")
     if [ "$ENABLED" != "true" ]; then
       exit 0
     fi
 
-    THRESHOLD=$(jq -r '.idleTime.thresholdMinutes // 5' "$CONFIG_FILE")
+    THRESHOLD=$(jq -r '.idleTime.thresholdMinutes // 5' "$CONFIG_FILE" 2>/dev/null || echo "5")
 
     TIMESTAMP_FILE="${TIMESTAMP_DIR}/${SESSION_ID}.txt"
     if [ ! -f "$TIMESTAMP_FILE" ]; then

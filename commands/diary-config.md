@@ -25,7 +25,7 @@ Activity score = prompts + toolCalls + filesModified + todos
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| enabled | false | Enable idle time detection |
+| enabled | true | Enable idle time detection (default: enabled) |
 | thresholdMinutes | 5 | Minutes of idle time before notification |
 
 ## Steps
@@ -65,8 +65,8 @@ Activity score = prompts + toolCalls + filesModified + todos
      - 10
 
    - **idleTime.enabled**: Enable idle time detection?
-     - false (Recommended) - disabled by default
-     - true - enable time tracking
+     - true (Recommended) - enabled by default
+     - false - disable time tracking
 
    - **idleTime.thresholdMinutes**: Idle threshold in minutes?
      - 5 (Recommended)

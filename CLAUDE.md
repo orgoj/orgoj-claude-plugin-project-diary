@@ -77,7 +77,7 @@ Recovery generator and idle time detection can be configured via `.claude/diary/
 - **limits**: Control how much data is saved in recovery files.
 
 **Idle Time Detection:**
-- **enabled**: Enable/disable idle time tracking (default: false)
+- **enabled**: Enable/disable idle time tracking (default: true)
 - **thresholdMinutes**: Minutes of idle time between Stop and UserPromptSubmit before notification is injected
 
 Use `/diary-config` to create config interactively.

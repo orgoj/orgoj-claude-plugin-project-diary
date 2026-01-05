@@ -135,7 +135,7 @@ When enabled via `/diary-config`, the plugin tracks time between Claude's respon
 - Claude knows to re-check actual status instead of repeating old information
 
 **Configuration:**
-- `idleTime.enabled`: false (default) | true
+- `idleTime.enabled`: true (default) | false
 - `idleTime.thresholdMinutes`: 5 (default) | 10 | 15
 
 ### Recovery vs Diary
