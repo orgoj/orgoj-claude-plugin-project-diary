@@ -10,18 +10,36 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
+# Parse arguments
+PROJECT_ROOT=""
+HOOK_EVENT=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --project-dir)
+      PROJECT_ROOT="$2"
+      shift 2
+      ;;
+    pre-compact|session-end|session-start)
+      HOOK_EVENT="$1"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
 # Read JSON from stdin
 HOOK_DATA=$(cat 2>/dev/null || true)
 
 # Parse JSON fields using jq
 SESSION_ID=$(echo "$HOOK_DATA" | jq -r '.session_id // empty')
-CWD=$(echo "$HOOK_DATA" | jq -r '.cwd // empty')
 SOURCE=$(echo "$HOOK_DATA" | jq -r '.source // empty')  # For SessionStart: startup|resume|clear|compact
-HOOK_EVENT=$1  # pre-compact | session-end | session-start
 
-# Fallback for CWD
-if [ -z "$CWD" ]; then
-  CWD="$(pwd)"
+# Fallback for PROJECT_ROOT
+if [ -z "$PROJECT_ROOT" ]; then
+  PROJECT_ROOT="$(pwd)"
 fi
 
 # Fallback for SESSION_ID (generate random if empty)
@@ -30,7 +48,7 @@ if [ -z "$SESSION_ID" ]; then
 fi
 
 # Diary directory (project-local)
-DIARY_DIR="${CWD}/.claude/diary"
+DIARY_DIR="${PROJECT_ROOT}/.claude/diary"
 
 # Generate filename: YYYY-MM-DD-HH-MM-SESSIONID.md
 TIMESTAMP=$(date +%Y-%m-%d-%H-%M)
@@ -56,7 +74,7 @@ case "$HOOK_EVENT" in
     # Build context string with XML tags for clear parsing
     CONTEXT="<session-info>
 SESSION_ID: ${SESSION_ID}
-PROJECT: ${CWD}
+PROJECT: ${PROJECT_ROOT}
 </session-info>"
 
     # Load recovery context only after compact

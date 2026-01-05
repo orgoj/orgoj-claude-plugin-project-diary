@@ -3,19 +3,31 @@
     "PreCompact": [{
       "hooks": [{
         "type": "command",
-        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/diary-hook.sh\" pre-compact"
+        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/diary-hook.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" pre-compact"
       }]
     }],
     "SessionEnd": [{
       "hooks": [{
         "type": "command",
-        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/diary-hook.sh\" session-end"
+        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/diary-hook.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" session-end"
       }]
     }],
     "SessionStart": [{
       "hooks": [{
         "type": "command",
-        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/diary-hook.sh\" session-start"
+        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/diary-hook.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" session-start"
+      }]
+    }],
+    "Stop": [{
+      "hooks": [{
+        "type": "command",
+        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/time-tracker.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" stop"
+      }]
+    }],
+    "UserPromptSubmit": [{
+      "hooks": [{
+        "type": "command",
+        "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/time-tracker.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" prompt"
       }]
     }]
   }

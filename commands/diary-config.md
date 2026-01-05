@@ -8,6 +8,8 @@ Create or update `.claude/diary/.config.json` with recovery settings.
 
 ## Current Defaults
 
+### Recovery Settings
+
 | Setting | Default | Description |
 |---------|---------|-------------|
 | minActivity | 1 | Minimum activity score to generate recovery |
@@ -18,6 +20,13 @@ Create or update `.claude/diary/.config.json` with recovery settings.
 | errors | 5 | Number of recent errors to save |
 
 Activity score = prompts + toolCalls + filesModified + todos
+
+### Idle Time Detection Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| enabled | false | Enable idle time detection |
+| thresholdMinutes | 5 | Minutes of idle time before notification |
 
 ## Steps
 
@@ -55,6 +64,15 @@ Activity score = prompts + toolCalls + filesModified + todos
      - 3
      - 10
 
+   - **idleTime.enabled**: Enable idle time detection?
+     - false (Recommended) - disabled by default
+     - true - enable time tracking
+
+   - **idleTime.thresholdMinutes**: Idle threshold in minutes?
+     - 5 (Recommended)
+     - 10
+     - 15
+
 3. **Write config file**:
    Check if `.claude/diary/` exists using Glob, then create directory only if needed:
    ```bash
@@ -73,6 +91,10 @@ Activity score = prompts + toolCalls + filesModified + todos
          "lastMessageLength": [selected value],
          "errors": [selected value]
        }
+     },
+     "idleTime": {
+       "enabled": [selected value],
+       "thresholdMinutes": [selected value]
      }
    }
    ```
@@ -84,3 +106,5 @@ Activity score = prompts + toolCalls + filesModified + todos
 - If user selects "Other", ask for custom numeric value
 - Config affects `recovery-generator.js` hook behavior
 - Sessions with activity below minActivity won't generate recovery files
+- Idle time detection requires `idleTime.enabled: true` to function
+- When enabled, tracks time between Stop hooks and notifies on new prompts if idle exceeds threshold

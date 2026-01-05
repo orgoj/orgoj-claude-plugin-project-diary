@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.0] - 2026-01-05
+
+### Added
+- **Idle time detection** - tracks time between Stop hooks and UserPromptSubmit
+- Automatic notification when user returns after extended idle period
+- Helps Claude understand context switches and time gaps
+- Configurable via `/diary-config` with `idleTime.enabled` and `idleTime.thresholdMinutes`
+- Example: After 20 minute break, Claude receives "Uplynulo 20 minut od poslední odpovědi" note
+
+### Changed
+- All hook commands now use `--project-dir` argument instead of cwd from hook input
+- Ensures correct project root detection regardless of current working directory
+- Updated `diary-hook.sh`, `time-tracker.sh` to accept `--project-dir` argument
+
+### Fixed
+- Timestamp storage uses simple text format (epoch seconds) instead of JSON
+- KISS principle: just `date +%s > file` instead of complex JSON parsing
+- Timestamps stored in `.claude/diary/timestamps/{SESSION_ID}.txt`
+
 ## [1.9.0] - 2026-01-02
 
 ### Changed

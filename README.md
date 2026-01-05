@@ -8,6 +8,7 @@ A Claude Code plugin for project-local session diaries with reflection to CLAUDE
 - **Session ID tracking**: Multiple Claude sessions can run without conflicts
 - **Automatic recovery**: PreCompact/SessionEnd hooks parse transcript and generate recovery files
 - **Context restoration**: After compact, previous recovery content is loaded into context
+- **Idle time detection**: Notifies Claude when significant time passed between responses
 - **Manual diary**: `/diary` command for structured session documentation
 - **Intelligent reflection**: `/reflect` analyzes patterns and updates CLAUDE.md
 - **Configurable recovery**: `/diary-config` to customize recovery limits and skip empty sessions
@@ -79,15 +80,15 @@ Analyze diary entries and update CLAUDE.md.
 
 ### /diary-config
 
-Configure recovery generator settings interactively.
+Configure recovery generator and idle time detection settings interactively.
 
 ```bash
 /diary-config
 ```
 
 Creates `.claude/diary/.config.json` with settings for:
-- **minActivity**: Skip sessions with low activity (default: 1)
-- **limits**: How much data to save (prompts, tool calls, errors, etc.)
+- **Recovery settings**: minActivity, data limits (prompts, tool calls, errors, etc.)
+- **Idle time detection**: Enable/disable, threshold in minutes
 
 ## How It Works
 
@@ -99,6 +100,8 @@ Creates `.claude/diary/.config.json` with settings for:
 | SessionStart (after compact) | Also loads previous recovery into context (`<recovery-context>`) |
 | PreCompact | Creates recovery file before context compaction |
 | SessionEnd | Creates recovery file when session ends |
+| Stop | Saves timestamp for idle time detection |
+| UserPromptSubmit | Checks idle time and injects notification if threshold exceeded |
 
 ### Data Flow
 
@@ -107,7 +110,33 @@ SessionStart → outputs SESSION_ID to context
 PreCompact/SessionEnd → hook parses transcript → generates recovery markdown
 SessionStart (compact) → loads previous recovery into context
 Manual /diary → Claude writes diary (uses SESSION_ID from context)
+Stop → saves timestamp
+UserPromptSubmit → checks idle time → injects notification if threshold exceeded
 ```
+
+### Idle Time Detection
+
+When enabled via `/diary-config`, the plugin tracks time between Claude's responses:
+
+1. **Stop hook**: Saves current timestamp to `.claude/diary/timestamps/{SESSION_ID}.txt`
+2. **User is idle**: User switches context, takes a break, etc.
+3. **User returns**: Submits new prompt
+4. **UserPromptSubmit hook**: Calculates `now - last_stop`
+5. **If threshold exceeded**: Injects notification into context:
+   ```
+   Uplynulo X minut od poslední odpovědi. Zvažte ověření aktuálního stavu.
+   ```
+
+**Example scenario:**
+- User asks "status?" → Claude responds
+- User leaves for 20 minutes
+- User returns and asks "status?" again
+- Plugin injects: "Uplynulo 20 minut od poslední odpovědi..."
+- Claude knows to re-check actual status instead of repeating old information
+
+**Configuration:**
+- `idleTime.enabled`: false (default) | true
+- `idleTime.thresholdMinutes`: 5 (default) | 10 | 15
 
 ### Recovery vs Diary
 
@@ -148,6 +177,8 @@ your-project/
 │       ├── recovery/                      # Auto-generated (hooks)
 │       │   ├── 2025-12-31-14-00-abc123.md
 │       │   └── 2025-12-31-16-00-def456.md
+│       ├── timestamps/                    # Idle time tracking (hooks)
+│       │   └── abc123.txt                 # Epoch timestamp of last Stop
 │       └── reflections/
 │           └── 2025-12-31-14-30-reflection-1.md    # Reflection documents
 └── CLAUDE.md                              # Updated by /reflect
