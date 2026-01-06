@@ -36,6 +36,7 @@ Activity score = prompts + toolCalls + filesModified + todos
 | autoReflect | false | Auto-run /reflect without asking |
 | askBeforeDiary | true | Prompt before running /diary |
 | askBeforeReflect | true | Prompt before running /reflect |
+| minSessionSize | 2 | Minimum session size (KB) to offer diary |
 
 ## Steps
 
@@ -98,6 +99,11 @@ Activity score = prompts + toolCalls + filesModified + todos
      - true (Recommended) - show prompt
      - false - skip prompt (respect autoReflect)
 
+   - **wrapper.minSessionSize**: Minimum session size (KB)?
+     - 2 (Recommended) - skip tiny sessions
+     - 0 - always offer diary
+     - 10 - only substantial sessions
+
 3. **Write config file**:
    Check if `.claude/diary/` exists using Glob, then create directory only if needed:
    ```bash
@@ -125,7 +131,8 @@ Activity score = prompts + toolCalls + filesModified + todos
        "autoDiary": [selected value],
        "autoReflect": [selected value],
        "askBeforeDiary": [selected value],
-       "askBeforeReflect": [selected value]
+       "askBeforeReflect": [selected value],
+       "minSessionSize": [selected value]
      }
    }
    ```

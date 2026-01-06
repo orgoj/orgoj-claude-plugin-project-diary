@@ -9,7 +9,10 @@ All notable changes to this project will be documented in this file.
 - Session ID generation and continuity using `--session-id` and `--resume` flags
 - Auto-detect unprocessed diaries on start → offers/auto `/reflect` in separate session
 - Auto-prompt for `/diary` at session end → runs in same session (maintains full context)
-- Wrapper config settings: `autoDiary`, `autoReflect`, `askBeforeDiary`, `askBeforeReflect`
+- **Minimum session size check** - skips diary prompt for tiny sessions (default: 2 KB)
+- **Wrapper CLI options** - `--min-session-size`, `--auto-diary`, `--auto-reflect`
+- **Argument separator (`--`)** - clean separation of wrapper and Claude options
+- Wrapper config settings: `autoDiary`, `autoReflect`, `askBeforeDiary`, `askBeforeReflect`, `minSessionSize`
 - Permission management via temporary `.claude/settings.local.json`
 - Pass-through support for all Claude CLI arguments
 

@@ -52,9 +52,17 @@ bin/claude-diary --model sonnet "fix the bug"
     "autoDiary": false,        // Auto-run /diary without asking
     "autoReflect": false,      // Auto-run /reflect without asking
     "askBeforeDiary": true,    // Show prompt before /diary
-    "askBeforeReflect": true   // Show prompt before /reflect
+    "askBeforeReflect": true,  // Show prompt before /reflect
+    "minSessionSize": 2        // Minimum session size (KB) to offer diary
   }
 }
+```
+
+**CLI Options:**
+```bash
+# Wrapper options (before --), Claude options (after --)
+bin/claude-diary --min-session-size 10 -- --model sonnet
+bin/claude-diary --auto-diary -- "fix the bug"
 ```
 
 ### Direct Claude CLI
