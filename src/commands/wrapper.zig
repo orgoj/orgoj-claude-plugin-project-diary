@@ -1,0 +1,329 @@
+const std = @import("std");
+const paths = @import("../shared/paths.zig");
+const config_mod = @import("../shared/config.zig");
+
+const Color = struct {
+    const reset = "\x1b[0m";
+    const green = "\x1b[0;32m";
+    const blue = "\x1b[0;34m";
+    const yellow = "\x1b[1;33m";
+};
+
+const WrapperArgs = struct {
+    min_session_size: ?u32 = null,
+    min_diary_count: ?u32 = null,
+    auto_diary: ?bool = null,
+    auto_reflect: ?bool = null,
+    claude_args: std.ArrayList([]const u8),
+};
+
+pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    // Parse arguments
+    var wrapper_args = try parseArgs(allocator, args);
+    defer wrapper_args.claude_args.deinit();
+
+    // Generate session ID
+    const session_id = try generateSessionId(allocator);
+    defer allocator.free(session_id);
+
+    // Find project root
+    const project_root = try findProjectRoot(allocator);
+    defer allocator.free(project_root);
+
+    // Load config
+    const config_path = try paths.getConfigPath(allocator, project_root);
+    defer allocator.free(config_path);
+    const config = try config_mod.load(allocator, config_path);
+
+    // Merge config with CLI args
+    var final_config = config.wrapper;
+    if (wrapper_args.min_session_size) |size| final_config.minSessionSize = size;
+    if (wrapper_args.min_diary_count) |count| final_config.minDiaryCount = count;
+    if (wrapper_args.auto_diary) |auto| final_config.autoDiary = auto;
+    if (wrapper_args.auto_reflect) |auto| final_config.autoReflect = auto;
+
+    // Setup temporary permissions
+    const temp_settings = try setupTempSettings(allocator, project_root);
+    defer allocator.free(temp_settings);
+    defer std.fs.cwd().deleteFile(temp_settings) catch {};
+
+    const stdout = std.io.getStdOut().writer();
+
+    // Print header
+    try stdout.print("{s}🚀 Claude Diary Wrapper{s}\n", .{ Color.blue, Color.reset });
+    try stdout.print("{s}   Session ID: {s}{s}\n\n", .{ Color.blue, session_id, Color.reset });
+
+    // Check for unprocessed diaries
+    const diary_dir = try paths.getDiaryDir(allocator, project_root);
+    defer allocator.free(diary_dir);
+    const unprocessed_count = try countUnprocessedDiaries(diary_dir);
+
+    if (unprocessed_count >= final_config.minDiaryCount) {
+        try stdout.print("{s}📚 Found {d} unprocessed diary file(s) (min: {d}){s}\n",
+            .{ Color.yellow, unprocessed_count, final_config.minDiaryCount, Color.reset });
+
+        const run_reflect = if (final_config.autoReflect) blk: {
+            try stdout.print("{s}🔄 Auto-running /reflect...{s}\n", .{ Color.green, Color.reset });
+            break :blk true;
+        } else if (final_config.askBeforeReflect) blk: {
+            break :blk try promptUser("Run /reflect to process them? [y/N] ");
+        } else false;
+
+        if (run_reflect) {
+            try runClaudeCommand(allocator, &.{"/reflect"});
+            try stdout.writeAll("\n");
+        }
+    } else if (unprocessed_count > 0) {
+        try stdout.print("{s}📚 Found {d} unprocessed diary file(s) (min required: {d}, skipping reflect){s}\n\n",
+            .{ Color.blue, unprocessed_count, final_config.minDiaryCount, Color.reset });
+    }
+
+    // Run main Claude session
+    try stdout.print("{s}💬 Starting Claude Code session...{s}\n\n", .{ Color.green, Color.reset });
+
+    var claude_cmd = std.ArrayList([]const u8).init(allocator);
+    defer claude_cmd.deinit();
+    try claude_cmd.appendSlice(&.{ "--session-id", session_id });
+    try claude_cmd.appendSlice(wrapper_args.claude_args.items);
+
+    try runClaudeCommand(allocator, claude_cmd.items);
+
+    // Check session size and offer diary
+    try stdout.print("\n{s}📝 Session ended{s}\n", .{ Color.blue, Color.reset });
+
+    const session_size = try getSessionSize(allocator, project_root, session_id);
+    try stdout.print("{s}   Transcript size: {d} KB (min: {d} KB){s}\n",
+        .{ Color.blue, session_size, final_config.minSessionSize, Color.reset });
+
+    if (session_size < final_config.minSessionSize) {
+        try stdout.print("{s}⏩ Session too small, skipping diary{s}\n\n", .{ Color.yellow, Color.reset });
+        try stdout.print("{s}✨ Done!{s}\n", .{ Color.green, Color.reset });
+        return;
+    }
+
+    // Offer diary
+    const run_diary = if (final_config.autoDiary) blk: {
+        try stdout.print("{s}📝 Auto-running /diary...{s}\n", .{ Color.green, Color.reset });
+        break :blk true;
+    } else if (final_config.askBeforeDiary) blk: {
+        break :blk try promptUser("Create diary for this session? [Y/n] ");
+    } else false;
+
+    if (run_diary) {
+        try stdout.writeAll("\n");
+        try runClaudeCommand(allocator, &.{ "--resume", session_id, "/diary" });
+    }
+
+    try stdout.print("\n{s}✨ Done!{s}\n", .{ Color.green, Color.reset });
+}
+
+fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !WrapperArgs {
+    var result = WrapperArgs{
+        .claude_args = std.ArrayList([]const u8).init(allocator),
+    };
+
+    var i: usize = 0;
+    var parsing_wrapper = true;
+
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
+
+        if (parsing_wrapper) {
+            if (std.mem.eql(u8, arg, "--min-session-size")) {
+                i += 1;
+                if (i >= args.len) return error.MissingArgument;
+                result.min_session_size = try std.fmt.parseInt(u32, args[i], 10);
+            } else if (std.mem.eql(u8, arg, "--min-diary-count")) {
+                i += 1;
+                if (i >= args.len) return error.MissingArgument;
+                result.min_diary_count = try std.fmt.parseInt(u32, args[i], 10);
+            } else if (std.mem.eql(u8, arg, "--auto-diary")) {
+                result.auto_diary = true;
+            } else if (std.mem.eql(u8, arg, "--auto-reflect")) {
+                result.auto_reflect = true;
+            } else if (std.mem.eql(u8, arg, "--")) {
+                parsing_wrapper = false;
+            } else {
+                // Not a wrapper arg, stop parsing wrapper options
+                parsing_wrapper = false;
+                try result.claude_args.append(arg);
+            }
+        } else {
+            try result.claude_args.append(arg);
+        }
+    }
+
+    return result;
+}
+
+fn generateSessionId(allocator: std.mem.Allocator) ![]u8 {
+    const charset = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const session_id = try allocator.alloc(u8, 8);
+
+    var random = std.crypto.random;
+    for (session_id) |*c| {
+        c.* = charset[random.intRangeAtMost(usize, 0, charset.len - 1)];
+    }
+
+    return session_id;
+}
+
+fn findProjectRoot(allocator: std.mem.Allocator) ![]u8 {
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    const cwd = try std.fs.cwd().realpath(".", &buf);
+
+    var current = try allocator.dupe(u8, cwd);
+
+    while (true) {
+        const claude_dir = try std.fs.path.join(allocator, &.{ current, ".claude" });
+        defer allocator.free(claude_dir);
+
+        if (std.fs.cwd().access(claude_dir, .{})) {
+            return current;
+        } else |_| {
+            // Try parent directory
+            if (std.mem.eql(u8, current, "/")) {
+                // Reached root without finding .claude, return original cwd
+                return try allocator.dupe(u8, cwd);
+            }
+
+            const parent = std.fs.path.dirname(current) orelse "/";
+            const new_current = try allocator.dupe(u8, parent);
+            allocator.free(current);
+            current = new_current;
+        }
+    }
+}
+
+fn setupTempSettings(allocator: std.mem.Allocator, project_root: []const u8) ![]u8 {
+    const settings_path = try std.fs.path.join(allocator, &.{ project_root, ".claude", "settings.local.json" });
+
+    const content =
+        \\{
+        \\  "allowedTools": [
+        \\    "SlashCommand(/diary)",
+        \\    "SlashCommand(/reflect)",
+        \\    "SlashCommand(/diary-config)",
+        \\    "Edit",
+        \\    "Write",
+        \\    "Read",
+        \\    "Glob",
+        \\    "Grep",
+        \\    "Bash(git *)",
+        \\    "Bash(jq *)",
+        \\    "Bash(find *)",
+        \\    "Bash(mkdir *)",
+        \\    "Bash(cat *)"
+        \\  ]
+        \\}
+        \\
+    ;
+
+    const file = try std.fs.cwd().createFile(settings_path, .{});
+    defer file.close();
+    try file.writeAll(content);
+
+    return settings_path;
+}
+
+fn countUnprocessedDiaries(diary_dir: []const u8) !u32 {
+    var dir = std.fs.cwd().openDir(diary_dir, .{ .iterate = true }) catch |err| {
+        if (err == error.FileNotFound) return 0;
+        return err;
+    };
+    defer dir.close();
+
+    var count: u32 = 0;
+    var iter = dir.iterate();
+
+    while (try iter.next()) |entry| {
+        if (entry.kind != .file) continue;
+        if (std.mem.endsWith(u8, entry.name, ".md")) {
+            count += 1;
+        }
+    }
+
+    return count;
+}
+
+fn getSessionSize(allocator: std.mem.Allocator, project_root: []const u8, session_id: []const u8) !u64 {
+    // Build transcript path: ~/.claude/projects/{project_name}/{session_id}.jsonl
+    const home = std.posix.getenv("HOME") orelse return 0;
+
+    // Convert project_root to project_name (replace / with -)
+    var project_name = std.ArrayList(u8).init(allocator);
+    defer project_name.deinit();
+    for (project_root) |c| {
+        if (c == '/') {
+            try project_name.append('-');
+        } else {
+            try project_name.append(c);
+        }
+    }
+
+    const filename = try std.fmt.allocPrint(allocator, "{s}.jsonl", .{session_id});
+    defer allocator.free(filename);
+
+    const transcript_path = try std.fs.path.join(allocator, &.{
+        home, ".claude", "projects", project_name.items, filename
+    });
+    defer allocator.free(transcript_path);
+
+    const file = std.fs.cwd().openFile(transcript_path, .{}) catch |err| {
+        if (err == error.FileNotFound) return 0;
+        return err;
+    };
+    defer file.close();
+
+    const stat = try file.stat();
+    return @intCast(stat.size / 1024); // Convert to KB
+}
+
+fn runClaudeCommand(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    var cmd_args = std.ArrayList([]const u8).init(allocator);
+    defer cmd_args.deinit();
+
+    try cmd_args.append("claude");
+    try cmd_args.append("code");
+    try cmd_args.appendSlice(args);
+
+    var child = std.process.Child.init(cmd_args.items, allocator);
+    child.stdin_behavior = .Inherit;
+    child.stdout_behavior = .Inherit;
+    child.stderr_behavior = .Inherit;
+
+    const term = try child.spawnAndWait();
+
+    switch (term) {
+        .Exited => |code| {
+            if (code != 0) {
+                std.process.exit(code);
+            }
+        },
+        else => {
+            std.process.exit(1);
+        },
+    }
+}
+
+fn promptUser(prompt: []const u8) !bool {
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.getStdOut().writer();
+
+    try stdout.writeAll(prompt);
+
+    var buf: [16]u8 = undefined;
+    const input = (try stdin.readUntilDelimiterOrEof(&buf, '\n')) orelse "";
+
+    if (input.len == 0) {
+        // Default behavior depends on prompt
+        if (std.mem.indexOf(u8, prompt, "[Y/n]") != null) {
+            return true; // Default yes
+        } else {
+            return false; // Default no
+        }
+    }
+
+    const first_char = std.ascii.toLower(input[0]);
+    return first_char == 'y';
+}
