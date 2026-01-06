@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
 - `/diary-config` now includes wrapper settings section
 - Documentation updated with wrapper usage examples and configuration
 
+### Fixed
+- **Wrapper now checks only diary files for `/reflect`** - recovery files are excluded
+- Recovery system is separate from diary/reflect workflow
+
 ## [1.11.0] - 2026-01-05
 
 ### Fixed

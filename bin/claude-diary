@@ -77,20 +77,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Check for unprocessed diaries
+# Check for unprocessed diary entries (not recovery files)
 check_unprocessed() {
-  local recovery_count=0
-  local manual_count=0
-
-  if [ -d "$DIARY_DIR/recovery" ]; then
-    recovery_count=$(find "$DIARY_DIR/recovery" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
-  fi
+  local count=0
 
   if [ -d "$DIARY_DIR" ]; then
-    manual_count=$(find "$DIARY_DIR" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+    count=$(find "$DIARY_DIR" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
   fi
 
-  echo $((recovery_count + manual_count))
+  echo $count
 }
 
 # Main flow
