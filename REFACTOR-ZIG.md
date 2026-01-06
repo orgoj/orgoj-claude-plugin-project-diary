@@ -1,31 +1,56 @@
 # REFACTOR-ZIG.md
 
-Complete guide for rewriting Bash/Node.js scripts to Zig CLI applications.
+Complete guide for migrating **Master of Prompts** from Bash/Node.js scripts to a single Zig CLI application.
 
 ## Table of Contents
 
-1. [Why Zig?](#why-zig)
-2. [Installing Zig](#installing-zig)
-3. [Project Structure](#project-structure)
-4. [Binary Naming Convention](#binary-naming-convention)
-5. [Build System](#build-system)
-6. [Installation & PATH Setup](#installation--path-setup)
-7. [Migration Plan](#migration-plan)
-8. [Zig Implementation Guide](#zig-implementation-guide)
+1. [Project Overview](#project-overview)
+2. [Why Zig?](#why-zig)
+3. [Installing Zig](#installing-zig)
+4. [Architecture: Single Binary with Subcommands](#architecture-single-binary-with-subcommands)
+5. [Project Structure](#project-structure)
+6. [Build System](#build-system)
+7. [Installation & PATH Setup](#installation--path-setup)
+8. [Migration Plan](#migration-plan)
+9. [Zig Implementation Guide](#zig-implementation-guide)
+
+---
+
+## Project Overview
+
+**Master of Prompts** (`mopc`) is a multi-AI CLI tool for managing session diaries, recovery, and reflection across AI models (Claude, Gemini, OpenCode, etc.).
+
+**Binary name:** `mopc` (Master of Prompts CLI)
+**Inspiration:** Metallica - Master of Puppets 🎸
+
+### Current Architecture (Bash/Node.js)
+- 4 separate scripts: wrapper, hook, tracker, recovery generator
+- Dependencies: Bash, jq, Node.js
+- Platform: Linux/macOS only
+
+### Target Architecture (Zig)
+- **1 binary** with subcommands
+- Zero dependencies (static linking)
+- Platform: Linux/Windows/macOS from single source
 
 ---
 
 ## Why Zig?
 
-### Single Binary per Platform
-- Static linking - no runtime dependencies (no Bash, jq, Node.js, Python)
-- One source → binaries for Linux/Windows/macOS
-- Cross-compilation built-in
+### Single Binary - Multiple Commands
+- One executable (`mopc`) handles all functionality via subcommands
+- Shared code compiled once (config loading, JSON parsing, path utils)
+- Size: ~500-900 KB total (vs 1.6-3.2 MB for 4 separate binaries)
+
+### Zero Dependencies
+- Static linking - no Bash, jq, Node.js, Python required
+- Cross-compilation built-in: one source → binaries for Linux/Windows/macOS
+- Distribution: download one file, done
 
 ### Fast & Deterministic
 - Startup time <1ms (vs 10-50ms for Bash+jq+node)
-- Explicit memory management
-- No garbage collector overhead
+- Explicit memory management, no GC overhead
+- Predictable resource usage
 
 ### Multiplatform by Design
 - Works natively on Windows (Bash scripts don't)
@@ -110,62 +135,81 @@ zig version
 
 ---
 
-## Project Structure
+## Architecture: Single Binary with Subcommands
 
+### Command Structure
+
+**One binary, multiple subcommands:**
+
+```bash
+mopc wrapper [OPTIONS] -- [AI_CLI_OPTIONS]
+mopc hook [session-start|pre-compact|session-end] [OPTIONS]
+mopc tracker [stop|prompt] [OPTIONS]
+mopc recovery [OPTIONS]
 ```
-orgoj-claude-plugin-project-diary/
-├── src/
-│   ├── wrapper/
-│   │   └── main.zig              # CLI wrapper (bin/claude-diary)
-│   ├── hook/
-│   │   └── main.zig              # Diary hook dispatcher (hooks/diary-hook.sh)
-│   ├── tracker/
-│   │   └── main.zig              # Idle time tracker (hooks/time-tracker.sh)
-│   ├── recovery/
-│   │   └── main.zig              # Recovery generator (hooks/recovery-generator.js)
-│   └── shared/
-│       ├── config.zig            # Config loading (.claude/diary/.config.json)
-│       ├── jsonl.zig             # JSONL transcript parsing
-│       └── paths.zig             # Path utilities
-│
-├── build.zig                     # Build configuration
-├── build.zig.zon                 # Dependencies (if needed)
-│
-├── zig-out/
-│   └── bin/                      # Compiled binaries (gitignored)
-│       ├── claude-diary-wrapper
-│       ├── claude-diary-hook
-│       ├── claude-diary-tracker
-│       └── claude-diary-recovery
-│
-├── bin/                          # Symlinks to zig-out/bin/ (gitignored)
-│   └── claude-diary → ../zig-out/bin/claude-diary-wrapper
-│
-└── hooks/
-    ├── hooks.json                # Updated to call Zig binaries
-    ├── diary-hook.sh → ../zig-out/bin/claude-diary-hook
-    ├── time-tracker.sh → ../zig-out/bin/claude-diary-tracker
-    └── recovery-generator.js → ../zig-out/bin/claude-diary-recovery
-```
+
+### Advantages Over Multiple Binaries
+
+| Aspect | 4 Binaries | 1 Binary + Subcommands |
+|--------|------------|------------------------|
+| **Size** | 1.6-3.2 MB total | ~500-900 KB total |
+| **Shared code** | Duplicated 4× | Compiled once |
+| **Distribution** | 4 files to install | 1 file to install |
+| **PATH setup** | Add directory or 4 symlinks | Add 1 binary |
+| **Updates** | Replace 4 files | Replace 1 file |
+| **Config loading** | 4× separate loads | 1× shared module |
+
+### Command Mapping
+
+| Original Script | Zig Subcommand | Purpose |
+|----------------|----------------|---------|
+| `bin/claude-diary` | `mopc wrapper` | Main CLI wrapper with session management |
+| `hooks/diary-hook.sh` | `mopc hook` | Hook event dispatcher |
+| `hooks/time-tracker.sh` | `mopc tracker` | Idle time tracking |
+| `hooks/recovery-generator.js` | `mopc recovery` | Recovery file generator |
 
 ---
 
-## Binary Naming Convention
+## Project Structure
 
-All binaries use the `claude-diary-*` prefix for clarity and namespace isolation:
+```
+orgoj-claude-plugin-project-diary/  # (will be renamed to master-of-prompts)
+├── src/
+│   ├── main.zig                 # Entry point - subcommand routing
+│   ├── commands/
+│   │   ├── wrapper.zig          # Wrapper command logic
+│   │   ├── hook.zig             # Hook dispatcher
+│   │   ├── tracker.zig          # Time tracker
+│   │   └── recovery.zig         # Recovery generator
+│   └── shared/
+│       ├── config.zig           # Config loading (.claude/diary/.config.json)
+│       ├── jsonl.zig            # JSONL transcript parsing
+│       └── paths.zig            # Path utilities (cross-platform)
+│
+├── build.zig                    # Build configuration (single executable)
+├── build.zig.zon                # Dependencies (if needed)
+│
+├── zig-out/
+│   └── bin/
+│       └── mopc                 # Single compiled binary (gitignored)
+│
+├── bin/
+│   └── claude-diary → ../zig-out/bin/mopc  # Symlink for backwards compat
+│
+└── hooks/
+    ├── hooks.json               # Updated to call `mopc hook`
+    ├── diary-hook.sh → ../zig-out/bin/mopc  # Symlink (for hook system)
+    ├── time-tracker.sh → ../zig-out/bin/mopc
+    └── recovery-generator.js → ../zig-out/bin/mopc
+```
 
-| Original Script | Zig Binary | Purpose |
-|----------------|------------|---------|
-| `bin/claude-diary` | `claude-diary-wrapper` | Main CLI wrapper |
-| `hooks/diary-hook.sh` | `claude-diary-hook` | Hook dispatcher |
-| `hooks/time-tracker.sh` | `claude-diary-tracker` | Idle time tracking |
-| `hooks/recovery-generator.js` | `claude-diary-recovery` | Recovery file generator |
+### Why Symlinks for Hooks?
 
-**Rationale:**
-- Clear namespace (`claude-diary-*`)
-- Avoids conflicts with system binaries
-- Easy to find via shell completion (`claude-diary-<TAB>`)
-- Consistent with plugin naming
+The hook system expects script names (`diary-hook.sh`, `time-tracker.sh`). Symlinks to `mopc` preserve backwards compatibility:
+
+- `hooks.json` calls → `diary-hook.sh` (symlink to mopc)
+- `mopc` inspects `argv[0]` to detect which command was called
+- Alternatively, update `hooks.json` to call `mopc hook` directly
 
 ---
 
@@ -180,70 +224,69 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Shared module for common code
-    const shared = b.addModule("shared", .{
-        .root_source_file = b.path("src/shared/config.zig"),
-    });
-
-    // 1. Wrapper (main CLI)
-    const wrapper = b.addExecutable(.{
-        .name = "claude-diary-wrapper",
-        .root_source_file = b.path("src/wrapper/main.zig"),
+    // Single executable with all commands
+    const exe = b.addExecutable(.{
+        .name = "mopc",
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    wrapper.root_module.addImport("shared", shared);
-    b.installArtifact(wrapper);
 
-    // 2. Hook dispatcher
-    const hook = b.addExecutable(.{
-        .name = "claude-diary-hook",
-        .root_source_file = b.path("src/hook/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    hook.root_module.addImport("shared", shared);
-    b.installArtifact(hook);
+    b.installArtifact(exe);
 
-    // 3. Time tracker
-    const tracker = b.addExecutable(.{
-        .name = "claude-diary-tracker",
-        .root_source_file = b.path("src/tracker/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    tracker.root_module.addImport("shared", shared);
-    b.installArtifact(tracker);
+    // Run command (for development)
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(b.getInstallStep());
 
-    // 4. Recovery generator
-    const recovery = b.addExecutable(.{
-        .name = "claude-diary-recovery",
-        .root_source_file = b.path("src/recovery/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    recovery.root_module.addImport("shared", shared);
-    b.installArtifact(recovery);
+    if (b.args) |args| {
+        run_cmd.addArgs(args);
+    }
+
+    const run_step = b.step("run", "Run mopc");
+    run_step.dependOn(&run_cmd.step);
 
     // Tests
     const test_step = b.step("test", "Run all tests");
 
-    const wrapper_tests = b.addTest(.{
-        .root_source_file = b.path("src/wrapper/main.zig"),
+    // Test main
+    const main_tests = b.addTest(.{
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    wrapper_tests.root_module.addImport("shared", shared);
+    const run_main_tests = b.addRunArtifact(main_tests);
+    test_step.dependOn(&run_main_tests.step);
 
-    const run_wrapper_tests = b.addRunArtifact(wrapper_tests);
-    test_step.dependOn(&run_wrapper_tests.step);
+    // Test commands
+    const commands = [_][]const u8{ "wrapper", "hook", "tracker", "recovery" };
+    inline for (commands) |cmd| {
+        const cmd_test = b.addTest(.{
+            .root_source_file = b.path(b.fmt("src/commands/{s}.zig", .{cmd})),
+            .target = target,
+            .optimize = optimize,
+        });
+        const run_cmd_test = b.addRunArtifact(cmd_test);
+        test_step.dependOn(&run_cmd_test.step);
+    }
+
+    // Test shared modules
+    const shared_modules = [_][]const u8{ "config", "jsonl", "paths" };
+    inline for (shared_modules) |mod| {
+        const mod_test = b.addTest(.{
+            .root_source_file = b.path(b.fmt("src/shared/{s}.zig", .{mod})),
+            .target = target,
+            .optimize = optimize,
+        });
+        const run_mod_test = b.addRunArtifact(mod_test);
+        test_step.dependOn(&run_mod_test.step);
+    }
 }
 ```
 
 ### Building
 
 ```bash
-# Build all binaries (debug)
+# Build binary (debug)
 zig build
 
 # Build optimized (release)
@@ -254,6 +297,10 @@ zig build -Dtarget=x86_64-windows
 zig build -Dtarget=x86_64-macos
 zig build -Dtarget=aarch64-macos
 
+# Run directly (for testing)
+zig build run -- wrapper --help
+zig build run -- hook session-start
+
 # Run tests
 zig build test
 
@@ -261,7 +308,7 @@ zig build test
 rm -rf zig-out zig-cache
 ```
 
-**Output:** Binaries in `zig-out/bin/`
+**Output:** Binary at `zig-out/bin/mopc`
 
 ---
 
@@ -270,16 +317,18 @@ rm -rf zig-out zig-cache
 ### Local Development (In Repository)
 
 ```bash
-# Build binaries
+# Build binary
 zig build -Doptimize=ReleaseSafe
 
-# Create symlinks for convenience
-ln -sf ../zig-out/bin/claude-diary-wrapper bin/claude-diary
-ln -sf ../zig-out/bin/claude-diary-hook hooks/diary-hook.sh
-ln -sf ../zig-out/bin/claude-diary-tracker hooks/time-tracker.sh
-ln -sf ../zig-out/bin/claude-diary-recovery hooks/recovery-generator.js
+# Create symlinks for backwards compatibility
+ln -sf ../zig-out/bin/mopc bin/claude-diary
 
-# Update hooks.json to use new binaries
+# Create hook symlinks (if using argv[0] detection)
+ln -sf ../zig-out/bin/mopc hooks/diary-hook.sh
+ln -sf ../zig-out/bin/mopc hooks/time-tracker.sh
+ln -sf ../zig-out/bin/mopc hooks/recovery-generator.js
+
+# OR update hooks.json to call mopc directly
 # (see Migration Plan section)
 ```
 
@@ -287,31 +336,32 @@ ln -sf ../zig-out/bin/claude-diary-recovery hooks/recovery-generator.js
 
 **Linux/macOS:**
 ```bash
-# Build release binaries
+# Build release binary
 zig build -Doptimize=ReleaseSafe
 
 # Install to user bin directory
 mkdir -p ~/.local/bin
-cp zig-out/bin/claude-diary-* ~/.local/bin/
+cp zig-out/bin/mopc ~/.local/bin/
 
 # Add to PATH (if not already)
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 
 # Verify
-which claude-diary-wrapper
+which mopc
+mopc --version
 ```
 
 **Windows:**
 ```powershell
-# Build release binaries
+# Build release binary
 zig build -Doptimize=ReleaseSafe
 
 # Create user bin directory
 New-Item -Path "$env:USERPROFILE\.local\bin" -ItemType Directory -Force
 
-# Copy binaries
-Copy-Item zig-out\bin\*.exe "$env:USERPROFILE\.local\bin\"
+# Copy binary
+Copy-Item zig-out\bin\mopc.exe "$env:USERPROFILE\.local\bin\"
 
 # Add to PATH permanently
 [Environment]::SetEnvironmentVariable(
@@ -321,46 +371,57 @@ Copy-Item zig-out\bin\*.exe "$env:USERPROFILE\.local\bin\"
 )
 
 # Verify (restart terminal first)
-where.exe claude-diary-wrapper
+where.exe mopc
+mopc --version
 ```
 
 ### Plugin-Specific Setup
 
-**Update `hooks/hooks.json`:**
+**Option 1: Update `hooks/hooks.json` to call mopc directly**
 ```json
 {
   "SessionStart": {
-    "command": "claude-diary-hook --project-dir \"${PROJECT_DIR}\" session-start"
+    "command": "mopc hook --project-dir \"${PROJECT_DIR}\" session-start"
   },
   "PreCompact": {
-    "command": "claude-diary-hook --project-dir \"${PROJECT_DIR}\" pre-compact"
+    "command": "mopc hook --project-dir \"${PROJECT_DIR}\" pre-compact"
   },
   "SessionEnd": {
-    "command": "claude-diary-hook --project-dir \"${PROJECT_DIR}\" session-end"
+    "command": "mopc hook --project-dir \"${PROJECT_DIR}\" session-end"
   },
   "Stop": {
-    "command": "claude-diary-tracker --project-dir \"${PROJECT_DIR}\" stop"
+    "command": "mopc tracker --project-dir \"${PROJECT_DIR}\" stop"
   },
   "UserPromptSubmit": {
-    "command": "claude-diary-tracker --project-dir \"${PROJECT_DIR}\" prompt"
+    "command": "mopc tracker --project-dir \"${PROJECT_DIR}\" prompt"
   }
 }
 ```
 
-**Update wrapper symlink:**
+**Option 2: Keep symlinks (backwards compatible)**
+```bash
+# Symlink mopc as script names
+ln -sf ../zig-out/bin/mopc hooks/diary-hook.sh
+ln -sf ../zig-out/bin/mopc hooks/time-tracker.sh
+
+# mopc detects command from argv[0]
+# (requires implementing argv[0] detection in main.zig)
+```
+
+**Update wrapper:**
 ```bash
 # In repository root
-ln -sf zig-out/bin/claude-diary-wrapper bin/claude-diary
+ln -sf zig-out/bin/mopc bin/claude-diary
 
-# Or use directly
-zig-out/bin/claude-diary-wrapper
+# Or call mopc wrapper directly
+mopc wrapper
 ```
 
 ---
 
 ## Migration Plan
 
-### Phase 1: Setup & Infrastructure (Start Here)
+### Phase 1: Setup & Infrastructure
 
 **Goal:** Zig toolchain + basic project structure
 
@@ -370,17 +431,88 @@ mise install zig@latest
 mise use -g zig@latest
 
 # 2. Create project structure
-mkdir -p src/{wrapper,hook,tracker,recovery,shared}
+mkdir -p src/{commands,shared}
 
 # 3. Create build.zig (see Build System section)
 
-# 4. Verify build works
+# 4. Create minimal main.zig
+cat > src/main.zig << 'EOF'
+const std = @import("std");
+
+pub fn main() !void {
+    std.debug.print("mopc v0.1.0 - Master of Prompts\n", .{});
+}
+EOF
+
+# 5. Verify build works
 zig build
+./zig-out/bin/mopc
 ```
 
-### Phase 2: Shared Libraries
+### Phase 2: Main Entry Point & Subcommand Routing
 
-**Goal:** Reusable code for all CLI apps
+**Goal:** Implement command dispatcher
+
+**File:** `src/main.zig`
+
+```zig
+const std = @import("std");
+const wrapper = @import("commands/wrapper.zig");
+const hook = @import("commands/hook.zig");
+const tracker = @import("commands/tracker.zig");
+const recovery = @import("commands/recovery.zig");
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    if (args.len < 2) {
+        try printUsage();
+        return;
+    }
+
+    const command = args[1];
+
+    if (std.mem.eql(u8, command, "wrapper")) {
+        try wrapper.run(allocator, args[2..]);
+    } else if (std.mem.eql(u8, command, "hook")) {
+        try hook.run(allocator, args[2..]);
+    } else if (std.mem.eql(u8, command, "tracker")) {
+        try tracker.run(allocator, args[2..]);
+    } else if (std.mem.eql(u8, command, "recovery")) {
+        try recovery.run(allocator, args[2..]);
+    } else if (std.mem.eql(u8, command, "--version")) {
+        std.debug.print("mopc v0.1.0 - Master of Prompts\n", .{});
+    } else {
+        std.debug.print("Unknown command: {s}\n\n", .{command});
+        try printUsage();
+        return error.UnknownCommand;
+    }
+}
+
+fn printUsage() !void {
+    const stdout = std.io.getStdOut().writer();
+    try stdout.writeAll(
+        \\mopc - Master of Prompts
+        \\
+        \\Usage:
+        \\  mopc wrapper [OPTIONS] -- [AI_CLI_OPTIONS]
+        \\  mopc hook [session-start|pre-compact|session-end] [OPTIONS]
+        \\  mopc tracker [stop|prompt] [OPTIONS]
+        \\  mopc recovery [OPTIONS]
+        \\  mopc --version
+        \\
+    );
+}
+```
+
+### Phase 3: Shared Libraries
+
+**Goal:** Reusable code for all commands
 
 **Files to create:**
 - `src/shared/config.zig` - Config loading/parsing
@@ -393,11 +525,67 @@ zig build
 - JSONL line-by-line streaming
 - Cross-platform path handling
 
-### Phase 3: Simplest CLI (Tracker)
+**Example `src/shared/config.zig` stub:**
+```zig
+const std = @import("std");
+
+pub const Config = struct {
+    wrapper: WrapperConfig = .{},
+    recovery: RecoveryConfig = .{},
+    idleTime: IdleTimeConfig = .{},
+
+    pub const WrapperConfig = struct {
+        autoDiary: bool = false,
+        autoReflect: bool = false,
+        askBeforeDiary: bool = true,
+        askBeforeReflect: bool = true,
+        minSessionSize: u32 = 2,
+        minDiaryCount: u32 = 1,
+    };
+
+    pub const RecoveryConfig = struct {
+        minActivity: u32 = 1,
+        limits: Limits = .{},
+
+        pub const Limits = struct {
+            userPrompts: u32 = 5,
+            promptLength: u32 = 150,
+            toolCalls: u32 = 10,
+            lastMessageLength: u32 = 500,
+            errors: u32 = 5,
+        };
+    };
+
+    pub const IdleTimeConfig = struct {
+        enabled: bool = true,
+        thresholdMinutes: u32 = 5,
+    };
+};
+
+pub fn load(allocator: std.mem.Allocator, path: []const u8) !Config {
+    const file = std.fs.cwd().openFile(path, .{}) catch |err| {
+        if (err == error.FileNotFound) {
+            return Config{};
+        }
+        return err;
+    };
+    defer file.close();
+
+    const content = try file.readToEndAlloc(allocator, 1024 * 1024);
+    defer allocator.free(content);
+
+    const parsed = try std.json.parseFromSlice(Config, allocator, content, .{});
+    defer parsed.deinit();
+
+    return parsed.value;
+}
+```
+
+### Phase 4: Simplest Command (Tracker)
 
 **Goal:** Learn Zig CLI patterns with minimal complexity
 
-**File:** `src/tracker/main.zig`
+**File:** `src/commands/tracker.zig`
 
 **Original:** `hooks/time-tracker.sh` (50 lines, simple file I/O)
 
@@ -407,27 +595,58 @@ zig build
 3. Calculate time difference
 4. Output JSON on idle threshold
 
-**Why start here:** No JSON config, no JSONL parsing, straightforward logic.
+**Why start here:** No complex JSON config, no JSONL parsing, straightforward logic.
 
-### Phase 4: Hook Dispatcher
+**Stub:**
+```zig
+const std = @import("std");
+
+pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    if (args.len < 1) {
+        return error.MissingSubcommand;
+    }
+
+    const subcommand = args[0];
+
+    if (std.mem.eql(u8, subcommand, "stop")) {
+        try handleStop(allocator, args[1..]);
+    } else if (std.mem.eql(u8, subcommand, "prompt")) {
+        try handlePrompt(allocator, args[1..]);
+    } else {
+        return error.UnknownSubcommand;
+    }
+}
+
+fn handleStop(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    // TODO: Save timestamp
+    std.debug.print("Tracker: stop\n", .{});
+}
+
+fn handlePrompt(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    // TODO: Check idle time
+    std.debug.print("Tracker: prompt\n", .{});
+}
+```
+
+### Phase 5: Hook Dispatcher
 
 **Goal:** Event routing and recovery triggering
 
-**File:** `src/hook/main.zig`
+**File:** `src/commands/hook.zig`
 
 **Original:** `hooks/diary-hook.sh` (100 lines, JSON I/O, process execution)
 
 **Rewrite steps:**
 1. Parse arguments (`session-start`, `pre-compact`, `session-end`)
 2. Read stdin JSON
-3. Route to recovery generator
+3. Route to recovery command
 4. Format output (`<session-info>`, `<recovery-context>`)
 
-### Phase 5: Recovery Generator
+### Phase 6: Recovery Generator
 
 **Goal:** JSONL transcript parsing
 
-**File:** `src/recovery/main.zig`
+**File:** `src/commands/recovery.zig`
 
 **Original:** `hooks/recovery-generator.js` (200 lines, complex JSONL parsing)
 
@@ -438,13 +657,13 @@ zig build
 4. Track activity metrics
 5. Generate recovery markdown
 
-**Why last:** Most complex, requires `shared/jsonl.zig`
+**Why later:** Most complex, requires `shared/jsonl.zig` and `shared/config.zig`
 
-### Phase 6: Wrapper CLI
+### Phase 7: Wrapper CLI
 
 **Goal:** Session management and automation
 
-**File:** `src/wrapper/main.zig`
+**File:** `src/commands/wrapper.zig`
 
 **Original:** `bin/claude-diary` (240 lines, argument parsing, process execution)
 
@@ -452,10 +671,10 @@ zig build
 1. Parse CLI arguments with `--` separator
 2. Load config
 3. Check unprocessed diary count
-4. Execute Claude CLI with session ID
+4. Execute AI CLI with session ID
 5. Offer/auto diary and reflect
 
-### Phase 7: Testing & Validation
+### Phase 8: Testing & Validation
 
 **Goal:** Ensure feature parity
 
@@ -465,15 +684,18 @@ zig build test
 
 # Compare outputs (Bash vs Zig)
 bash hooks/time-tracker.sh stop
-claude-diary-tracker stop
+mopc tracker stop
 
-# Test all hooks
-echo '{"session_id":"test"}' | claude-diary-hook session-start
+# Test all commands
+mopc wrapper --help
+echo '{"session_id":"test"}' | mopc hook session-start
+mopc tracker stop
+mopc recovery --help
 ```
 
-### Phase 8: Cutover
+### Phase 9: Cutover
 
-**Goal:** Replace Bash/Node.js with Zig binaries
+**Goal:** Replace Bash/Node.js with Zig binary
 
 ```bash
 # Backup old scripts
@@ -482,22 +704,22 @@ mv hooks/*.{sh,js} legacy/
 mv bin/claude-diary legacy/
 
 # Create symlinks
-ln -sf ../zig-out/bin/claude-diary-wrapper bin/claude-diary
-ln -sf ../zig-out/bin/claude-diary-hook hooks/diary-hook.sh
-ln -sf ../zig-out/bin/claude-diary-tracker hooks/time-tracker.sh
-ln -sf ../zig-out/bin/claude-diary-recovery hooks/recovery-generator.js
+ln -sf ../zig-out/bin/mopc bin/claude-diary
+ln -sf ../zig-out/bin/mopc hooks/diary-hook.sh
+ln -sf ../zig-out/bin/mopc hooks/time-tracker.sh
+ln -sf ../zig-out/bin/mopc hooks/recovery-generator.js
 
-# Update hooks.json (already points to script names, symlinks handle rest)
+# Update hooks.json (or use symlinks with argv[0] detection)
 
 # Test full workflow
-bin/claude-diary
+mopc wrapper
 ```
 
 ---
 
 ## Zig Implementation Guide
 
-### Argument Parsing
+### Subcommand Routing (Main)
 
 ```zig
 const std = @import("std");
@@ -511,19 +733,54 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     if (args.len < 2) {
-        std.debug.print("Usage: {s} <command>\n", .{args[0]});
+        std.debug.print("Usage: mopc <command> [args...]\n", .{});
         return error.InvalidArgs;
     }
 
     const command = args[1];
 
-    if (std.mem.eql(u8, command, "start")) {
-        try handleStart();
-    } else if (std.mem.eql(u8, command, "stop")) {
-        try handleStop();
+    if (std.mem.eql(u8, command, "wrapper")) {
+        const wrapper = @import("commands/wrapper.zig");
+        try wrapper.run(allocator, args[2..]);
+    } else if (std.mem.eql(u8, command, "hook")) {
+        const hook = @import("commands/hook.zig");
+        try hook.run(allocator, args[2..]);
     } else {
         return error.UnknownCommand;
     }
+}
+```
+
+### Argument Parsing with Flags
+
+```zig
+const std = @import("std");
+
+pub fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !struct {
+    project_dir: ?[]const u8,
+    subcommand: []const u8,
+} {
+    var project_dir: ?[]const u8 = null;
+    var subcommand: ?[]const u8 = null;
+
+    var i: usize = 0;
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
+
+        if (std.mem.eql(u8, arg, "--project-dir")) {
+            i += 1;
+            if (i >= args.len) return error.MissingValue;
+            project_dir = args[i];
+        } else if (!std.mem.startsWith(u8, arg, "-")) {
+            subcommand = arg;
+            break;
+        }
+    }
+
+    return .{
+        .project_dir = project_dir,
+        .subcommand = subcommand orelse return error.MissingSubcommand,
+    };
 }
 ```
 
@@ -606,9 +863,9 @@ fn parseTranscript(allocator: std.mem.Allocator, path: []const u8) !void {
 ```zig
 const std = @import("std");
 
-fn runClaude(allocator: std.mem.Allocator, session_id: []const u8) !void {
+fn runAICLI(allocator: std.mem.Allocator, cli_name: []const u8, session_id: []const u8) !void {
     const argv = &[_][]const u8{
-        "claude",
+        cli_name,
         "code",
         "--session-id",
         session_id,
@@ -624,10 +881,10 @@ fn runClaude(allocator: std.mem.Allocator, session_id: []const u8) !void {
     switch (term) {
         .Exited => |code| {
             if (code != 0) {
-                return error.ClaudeFailed;
+                return error.AIFailed;
             }
         },
-        else => return error.ClaudeTerminated,
+        else => return error.AITerminated,
     }
 }
 ```
@@ -648,6 +905,27 @@ fn ensureDirExists(path: []const u8) !void {
             return err;
         }
     };
+}
+```
+
+### Reading stdin (for hooks)
+
+```zig
+const std = @import("std");
+
+fn readStdinJson(allocator: std.mem.Allocator) !std.json.Value {
+    const stdin = std.io.getStdIn();
+    const content = try stdin.readToEndAlloc(allocator, 10 * 1024 * 1024);
+    defer allocator.free(content);
+
+    const parsed = try std.json.parseFromSlice(
+        std.json.Value,
+        allocator,
+        content,
+        .{}
+    );
+
+    return parsed.value;
 }
 ```
 
@@ -676,17 +954,31 @@ fn run() !void {
 
 ### Before (Bash/Node.js)
 - **Dependencies:** Bash, jq, Node.js, various shell utilities
-- **Startup:** 10-50ms per hook invocation
+- **Scripts:** 4 separate scripts (~600 lines total)
+- **Startup:** 10-50ms per invocation
+- **Size:** ~40 MB (Node.js runtime) + scripts
 - **Platform:** Linux/macOS only (Windows requires WSL)
-- **Distribution:** Users must install all dependencies
+- **Distribution:** Users must install Bash, jq, Node.js
 - **Debugging:** Shell script complexity, implicit behavior
 
 ### After (Zig)
 - **Dependencies:** None (static binary)
-- **Startup:** <1ms per hook invocation
+- **Binary:** 1 executable with 4 subcommands (~500-900 KB)
+- **Startup:** <1ms per invocation
+- **Size:** ~500-900 KB total
 - **Platform:** Native Linux/Windows/macOS from single source
-- **Distribution:** Download binary, done
+- **Distribution:** Download one binary, done
 - **Debugging:** Explicit logic, type safety, clear error messages
+
+### Size Comparison
+
+| Component | Bash/Node | Zig |
+|-----------|-----------|-----|
+| Runtime | ~40 MB (Node.js) | 0 B (static) |
+| Scripts/Binary | ~20 KB | ~500-900 KB |
+| **Total** | **~40 MB** | **~500-900 KB** |
+
+**Zig is 40-80× smaller** when including runtime dependencies.
 
 ---
 
@@ -697,16 +989,20 @@ fn run() !void {
 - **Standard Library:** https://ziglang.org/documentation/master/std/
 - **Build System Guide:** https://zig.guide/build-system/
 - **Cross-Compilation:** https://ziglang.org/learn/overview/#cross-compiling-is-a-first-class-use-case
+- **Process API:** https://ziglang.org/documentation/master/std/#std.process
+- **JSON API:** https://ziglang.org/documentation/master/std/#std.json
 
 ---
 
 ## Next Steps
 
 1. **Install Zig** via mise: `mise install zig@latest`
-2. **Create structure:** `mkdir -p src/{wrapper,hook,tracker,recovery,shared}`
+2. **Create structure:** `mkdir -p src/{commands,shared}`
 3. **Copy build.zig** from this document
-4. **Start with Phase 3:** Rewrite `time-tracker.sh` → `src/tracker/main.zig`
-5. **Test iteratively:** Compare Bash vs Zig outputs
-6. **Complete migration:** Follow phases 4-8
+4. **Phase 2:** Implement main.zig with subcommand routing
+5. **Phase 3:** Create shared modules (config, jsonl, paths)
+6. **Phase 4:** Start with tracker (simplest command)
+7. **Phases 5-7:** Implement hook, recovery, wrapper
+8. **Phase 8-9:** Test and cutover
 
-Good luck! 🚀
+**Master of Prompts** - Multi-AI CLI tool 🎸
