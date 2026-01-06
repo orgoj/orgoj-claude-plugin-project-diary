@@ -53,7 +53,8 @@ bin/claude-diary --model sonnet "fix the bug"
     "autoReflect": false,      // Auto-run /reflect without asking
     "askBeforeDiary": true,    // Show prompt before /diary
     "askBeforeReflect": true,  // Show prompt before /reflect
-    "minSessionSize": 2        // Minimum session size (KB) to offer diary
+    "minSessionSize": 2,       // Minimum session size (KB) to offer diary
+    "minDiaryCount": 1         // Minimum diary files to offer reflect
   }
 }
 ```
@@ -62,7 +63,7 @@ bin/claude-diary --model sonnet "fix the bug"
 ```bash
 # Wrapper options (before --), Claude options (after --)
 bin/claude-diary --min-session-size 10 -- --model sonnet
-bin/claude-diary --auto-diary -- "fix the bug"
+bin/claude-diary --min-diary-count 3 --auto-reflect -- "fix bug"
 ```
 
 ### Direct Claude CLI

@@ -84,7 +84,8 @@ Recovery generator, idle time detection, and wrapper behavior can be configured 
     "autoReflect": false,
     "askBeforeDiary": true,
     "askBeforeReflect": true,
-    "minSessionSize": 2
+    "minSessionSize": 2,
+    "minDiaryCount": 1
   }
 }
 ```
@@ -103,6 +104,7 @@ Recovery generator, idle time detection, and wrapper behavior can be configured 
 - **askBeforeDiary**: Show prompt before running `/diary` (default: true)
 - **askBeforeReflect**: Show prompt before running `/reflect` (default: true)
 - **minSessionSize**: Minimum transcript size in KB to offer diary (default: 2)
+- **minDiaryCount**: Minimum number of diary files to offer reflect (default: 1)
 
 Use `/diary-config` to create/update config interactively.
 
@@ -112,13 +114,14 @@ bin/claude-diary [WRAPPER_OPTIONS] -- [CLAUDE_OPTIONS]
 
 Wrapper options (before --):
   --min-session-size N    Minimum session size in KB (default: 2)
+  --min-diary-count N     Minimum diary count for reflect (default: 1)
   --auto-diary            Force auto-diary mode
   --auto-reflect          Force auto-reflect mode
   --                      Separator (all args after go to Claude CLI)
 
 Examples:
   bin/claude-diary --min-session-size 10 -- --model sonnet
-  bin/claude-diary --auto-diary -- "fix the bug"
+  bin/claude-diary --min-diary-count 3 --auto-reflect -- "fix bug"
 ```
 
 ## Usage

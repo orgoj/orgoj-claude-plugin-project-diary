@@ -19,6 +19,7 @@ NC='\033[0m' # No Color
 
 # Parse wrapper arguments (before --)
 WRAPPER_MIN_SIZE=""
+WRAPPER_MIN_DIARY_COUNT=""
 WRAPPER_AUTO_DIARY=""
 WRAPPER_AUTO_REFLECT=""
 CLAUDE_ARGS=()
@@ -30,6 +31,12 @@ for arg in "$@"; do
       --min-session-size)
         shift
         WRAPPER_MIN_SIZE="$1"
+        shift
+        continue
+        ;;
+      --min-diary-count)
+        shift
+        WRAPPER_MIN_DIARY_COUNT="$1"
         shift
         continue
         ;;
@@ -87,6 +94,7 @@ if [ -f "$CONFIG_FILE" ]; then
   ASK_DIARY=$(jq -r '.wrapper.askBeforeDiary // true' "$CONFIG_FILE" 2>/dev/null || echo "true")
   ASK_REFLECT=$(jq -r '.wrapper.askBeforeReflect // true' "$CONFIG_FILE" 2>/dev/null || echo "true")
   MIN_SESSION_SIZE=$(jq -r '.wrapper.minSessionSize // 2' "$CONFIG_FILE" 2>/dev/null || echo "2")
+  MIN_DIARY_COUNT=$(jq -r '.wrapper.minDiaryCount // 1' "$CONFIG_FILE" 2>/dev/null || echo "1")
 else
   # Defaults if no config
   AUTO_DIARY="false"
@@ -94,6 +102,7 @@ else
   ASK_DIARY="true"
   ASK_REFLECT="true"
   MIN_SESSION_SIZE="2"
+  MIN_DIARY_COUNT="1"
 fi
 
 # Override with CLI arguments
@@ -105,6 +114,9 @@ if [ -n "$WRAPPER_AUTO_REFLECT" ]; then
 fi
 if [ -n "$WRAPPER_MIN_SIZE" ]; then
   MIN_SESSION_SIZE="$WRAPPER_MIN_SIZE"
+fi
+if [ -n "$WRAPPER_MIN_DIARY_COUNT" ]; then
+  MIN_DIARY_COUNT="$WRAPPER_MIN_DIARY_COUNT"
 fi
 
 # Setup temporary permissions for automated commands
@@ -172,8 +184,8 @@ echo ""
 # [1] Check for unprocessed diaries
 UNPROCESSED_COUNT=$(check_unprocessed)
 
-if [ "$UNPROCESSED_COUNT" -gt 0 ]; then
-  echo -e "${YELLOW}📚 Found ${UNPROCESSED_COUNT} unprocessed diary file(s)${NC}"
+if [ "$UNPROCESSED_COUNT" -ge "$MIN_DIARY_COUNT" ]; then
+  echo -e "${YELLOW}📚 Found ${UNPROCESSED_COUNT} unprocessed diary file(s) (min: ${MIN_DIARY_COUNT})${NC}"
 
   RUN_REFLECT=false
 
@@ -192,6 +204,9 @@ if [ "$UNPROCESSED_COUNT" -gt 0 ]; then
     claude code /reflect
     echo ""
   fi
+elif [ "$UNPROCESSED_COUNT" -gt 0 ]; then
+  echo -e "${BLUE}📚 Found ${UNPROCESSED_COUNT} unprocessed diary file(s) (min required: ${MIN_DIARY_COUNT}, skipping reflect)${NC}"
+  echo ""
 fi
 
 # [2] Run main Claude session with session ID

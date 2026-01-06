@@ -10,9 +10,10 @@ All notable changes to this project will be documented in this file.
 - Auto-detect unprocessed diaries on start → offers/auto `/reflect` in separate session
 - Auto-prompt for `/diary` at session end → runs in same session (maintains full context)
 - **Minimum session size check** - skips diary prompt for tiny sessions (default: 2 KB)
-- **Wrapper CLI options** - `--min-session-size`, `--auto-diary`, `--auto-reflect`
+- **Minimum diary count check** - skips reflect prompt when too few diaries (default: 1)
+- **Wrapper CLI options** - `--min-session-size`, `--min-diary-count`, `--auto-diary`, `--auto-reflect`
 - **Argument separator (`--`)** - clean separation of wrapper and Claude options
-- Wrapper config settings: `autoDiary`, `autoReflect`, `askBeforeDiary`, `askBeforeReflect`, `minSessionSize`
+- Wrapper config settings: `autoDiary`, `autoReflect`, `askBeforeDiary`, `askBeforeReflect`, `minSessionSize`, `minDiaryCount`
 - Permission management via temporary `.claude/settings.local.json`
 - Pass-through support for all Claude CLI arguments
 
