@@ -30,10 +30,15 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const project_root = try findProjectRoot(allocator);
     defer allocator.free(project_root);
 
-    // Load config
-    const config_path = try paths.getConfigPath(allocator, project_root);
-    defer allocator.free(config_path);
-    const config = try config_mod.load(allocator, config_path);
+    // Load merged config (home + project)
+    var home_config = try config_mod.loadHomeConfig(allocator);
+    defer home_config.deinit();
+
+    var project_config = try config_mod.loadProjectConfig(allocator, project_root);
+    defer project_config.deinit();
+
+    var config = try config_mod.mergeConfigs(allocator, home_config, project_config);
+    defer config.deinit();
 
     // Merge config with CLI args
     var final_config = config.wrapper;
@@ -59,8 +64,7 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const unprocessed_count = try countUnprocessedDiaries(diary_dir);
 
     if (unprocessed_count >= final_config.minDiaryCount) {
-        try stdout.print("{s}📚 Found {d} unprocessed diary file(s) (min: {d}){s}\n",
-            .{ Color.yellow, unprocessed_count, final_config.minDiaryCount, Color.reset });
+        try stdout.print("{s}📚 Found {d} unprocessed diary file(s) (min: {d}){s}\n", .{ Color.yellow, unprocessed_count, final_config.minDiaryCount, Color.reset });
 
         const run_reflect = if (final_config.autoReflect) blk: {
             try stdout.print("{s}🔄 Auto-running /reflect...{s}\n", .{ Color.green, Color.reset });
@@ -70,30 +74,33 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
         } else false;
 
         if (run_reflect) {
-            try runClaudeCommand(allocator, &.{"/reflect"});
+            var reflect_config = try config_mod.resolveClaudeConfig(allocator, config.claude, config.claude.override.reflect);
+            defer reflect_config.deinit();
+            try runClaude(allocator, reflect_config, &.{"/reflect"});
             try stdout.writeAll("\n");
         }
     } else if (unprocessed_count > 0) {
-        try stdout.print("{s}📚 Found {d} unprocessed diary file(s) (min required: {d}, skipping reflect){s}\n\n",
-            .{ Color.blue, unprocessed_count, final_config.minDiaryCount, Color.reset });
+        try stdout.print("{s}📚 Found {d} unprocessed diary file(s) (min required: {d}, skipping reflect){s}\n\n", .{ Color.blue, unprocessed_count, final_config.minDiaryCount, Color.reset });
     }
 
     // Run main Claude session
     try stdout.print("{s}💬 Starting Claude Code session...{s}\n\n", .{ Color.green, Color.reset });
 
-    var claude_cmd = std.ArrayList([]const u8).init(allocator);
-    defer claude_cmd.deinit();
-    try claude_cmd.appendSlice(&.{ "--session-id", session_id });
-    try claude_cmd.appendSlice(wrapper_args.claude_args.items);
+    var main_config = try config_mod.resolveClaudeConfig(allocator, config.claude, config.claude.override.main);
+    defer main_config.deinit();
 
-    try runClaudeCommand(allocator, claude_cmd.items);
+    var claude_args = std.ArrayList([]const u8).init(allocator);
+    defer claude_args.deinit();
+    try claude_args.appendSlice(&.{ "--session-id", session_id });
+    try claude_args.appendSlice(wrapper_args.claude_args.items);
+
+    try runClaude(allocator, main_config, claude_args.items);
 
     // Check session size and offer diary
     try stdout.print("\n{s}📝 Session ended{s}\n", .{ Color.blue, Color.reset });
 
     const session_size = try getSessionSize(allocator, project_root, session_id);
-    try stdout.print("{s}   Transcript size: {d} KB (min: {d} KB){s}\n",
-        .{ Color.blue, session_size, final_config.minSessionSize, Color.reset });
+    try stdout.print("{s}   Transcript size: {d} KB (min: {d} KB){s}\n", .{ Color.blue, session_size, final_config.minSessionSize, Color.reset });
 
     if (session_size < final_config.minSessionSize) {
         try stdout.print("{s}⏩ Session too small, skipping diary{s}\n\n", .{ Color.yellow, Color.reset });
@@ -111,10 +118,193 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     if (run_diary) {
         try stdout.writeAll("\n");
-        try runClaudeCommand(allocator, &.{ "--resume", session_id, "/diary" });
+        var diary_config = try config_mod.resolveClaudeConfig(allocator, config.claude, config.claude.override.diary);
+        defer diary_config.deinit();
+        try runClaude(allocator, diary_config, &.{ "--resume", session_id, "/diary" });
     }
 
     try stdout.print("\n{s}✨ Done!{s}\n", .{ Color.green, Color.reset });
+}
+
+/// Run Claude with the specified configuration
+fn runClaude(
+    allocator: std.mem.Allocator,
+    claude_config: config_mod.ClaudeConfig,
+    extra_args: []const []const u8,
+) !void {
+    // Build command
+    var cmd_args = std.ArrayList([]const u8).init(allocator);
+    defer cmd_args.deinit();
+
+    try cmd_args.append(claude_config.cmd);
+    try cmd_args.append("code");
+    try cmd_args.appendSlice(extra_args);
+
+    // Build environment map
+    var env_map = std.process.EnvMap.init(allocator);
+    defer env_map.deinit();
+
+    // Start with current environment
+    var current_env = try std.process.getEnvMap(allocator);
+    defer current_env.deinit();
+
+    // Copy current environment
+    var curr_it = current_env.hash_map.iterator();
+    while (curr_it.next()) |entry| {
+        try env_map.put(entry.key_ptr.*, entry.value_ptr.*);
+    }
+
+    // Apply config environment variables
+    var env_it = claude_config.env.iterator();
+    while (env_it.next()) |entry| {
+        const key = entry.key_ptr.*;
+        const value = entry.value_ptr.*;
+
+        switch (value) {
+            .literal => |v| {
+                try env_map.put(key, v);
+            },
+            .reference => |ref| {
+                // Resolve environment variable reference
+                if (current_env.get(ref)) |resolved| {
+                    try env_map.put(key, resolved);
+                }
+            },
+            .unset => {
+                // Remove the variable
+                _ = env_map.remove(key);
+            },
+        }
+    }
+
+    // Run in tmux if configured
+    if (claude_config.tmux) |tmux_session| {
+        try runInTmux(allocator, tmux_session, cmd_args.items, env_map);
+    } else {
+        try runCommand(allocator, cmd_args.items, env_map);
+    }
+}
+
+/// Run command in tmux session
+fn runInTmux(
+    allocator: std.mem.Allocator,
+    session_name: []const u8,
+    command: []const []const u8,
+    env_map: std.process.EnvMap,
+) !void {
+    // Check if tmux is available
+    const tmux_check = std.process.Child.run(.{
+        .allocator = allocator,
+        .argv = &.{ "which", "tmux" },
+    }) catch {
+        std.debug.print("Warning: tmux not found, running command directly\n", .{});
+        return runCommand(allocator, command, env_map);
+    };
+    defer allocator.free(tmux_check.stdout);
+    defer allocator.free(tmux_check.stderr);
+
+    if (tmux_check.term.Exited != 0) {
+        std.debug.print("Warning: tmux not found, running command directly\n", .{});
+        return runCommand(allocator, command, env_map);
+    }
+
+    // Build tmux command
+    var tmux_cmd = std.ArrayList([]const u8).init(allocator);
+    defer tmux_cmd.deinit();
+
+    // Check if session exists
+    const session_check = std.process.Child.run(.{
+        .allocator = allocator,
+        .argv = &.{ "tmux", "has-session", "-t", session_name },
+    }) catch null;
+
+    const session_exists = if (session_check) |check| blk: {
+        defer allocator.free(check.stdout);
+        defer allocator.free(check.stderr);
+        break :blk check.term.Exited == 0;
+    } else false;
+
+    // Build command string for tmux
+    var cmd_string = std.ArrayList(u8).init(allocator);
+    defer cmd_string.deinit();
+
+    // Add environment variables to command
+    var env_it = env_map.hash_map.iterator();
+    while (env_it.next()) |entry| {
+        const key = entry.key_ptr.*;
+        const value = entry.value_ptr.*;
+        try cmd_string.appendSlice(key);
+        try cmd_string.append('=');
+        try cmd_string.append('"');
+        try cmd_string.appendSlice(value);
+        try cmd_string.appendSlice("\" ");
+    }
+
+    // Add command
+    for (command, 0..) |arg, i| {
+        if (i > 0) try cmd_string.append(' ');
+        // Quote arguments with spaces
+        if (std.mem.indexOf(u8, arg, " ") != null) {
+            try cmd_string.append('"');
+            try cmd_string.appendSlice(arg);
+            try cmd_string.append('"');
+        } else {
+            try cmd_string.appendSlice(arg);
+        }
+    }
+
+    if (session_exists) {
+        // Attach to existing session
+        try tmux_cmd.appendSlice(&.{ "tmux", "attach-session", "-t", session_name });
+    } else {
+        // Create new session
+        try tmux_cmd.appendSlice(&.{ "tmux", "new-session", "-s", session_name, cmd_string.items });
+    }
+
+    // Run tmux command
+    var child = std.process.Child.init(tmux_cmd.items, allocator);
+    child.stdin_behavior = .Inherit;
+    child.stdout_behavior = .Inherit;
+    child.stderr_behavior = .Inherit;
+
+    const term = try child.spawnAndWait();
+
+    switch (term) {
+        .Exited => |code| {
+            if (code != 0) {
+                std.process.exit(code);
+            }
+        },
+        else => {
+            std.process.exit(1);
+        },
+    }
+}
+
+/// Run command directly (no tmux)
+fn runCommand(
+    allocator: std.mem.Allocator,
+    command: []const []const u8,
+    env_map: std.process.EnvMap,
+) !void {
+    var child = std.process.Child.init(command, allocator);
+    child.stdin_behavior = .Inherit;
+    child.stdout_behavior = .Inherit;
+    child.stderr_behavior = .Inherit;
+    child.env_map = &env_map;
+
+    const term = try child.spawnAndWait();
+
+    switch (term) {
+        .Exited => |code| {
+            if (code != 0) {
+                std.process.exit(code);
+            }
+        },
+        else => {
+            std.process.exit(1);
+        },
+    }
 }
 
 fn parseArgs(allocator: std.mem.Allocator, args: []const []const u8) !WrapperArgs {
@@ -265,7 +455,11 @@ fn getSessionSize(allocator: std.mem.Allocator, project_root: []const u8, sessio
     defer allocator.free(filename);
 
     const transcript_path = try std.fs.path.join(allocator, &.{
-        home, ".claude", "projects", project_name.items, filename
+        home,
+        ".claude",
+        "projects",
+        project_name.items,
+        filename,
     });
     defer allocator.free(transcript_path);
 
@@ -277,33 +471,6 @@ fn getSessionSize(allocator: std.mem.Allocator, project_root: []const u8, sessio
 
     const stat = try file.stat();
     return @intCast(stat.size / 1024); // Convert to KB
-}
-
-fn runClaudeCommand(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    var cmd_args = std.ArrayList([]const u8).init(allocator);
-    defer cmd_args.deinit();
-
-    try cmd_args.append("claude");
-    try cmd_args.append("code");
-    try cmd_args.appendSlice(args);
-
-    var child = std.process.Child.init(cmd_args.items, allocator);
-    child.stdin_behavior = .Inherit;
-    child.stdout_behavior = .Inherit;
-    child.stderr_behavior = .Inherit;
-
-    const term = try child.spawnAndWait();
-
-    switch (term) {
-        .Exited => |code| {
-            if (code != 0) {
-                std.process.exit(code);
-            }
-        },
-        else => {
-            std.process.exit(1);
-        },
-    }
 }
 
 fn promptUser(prompt: []const u8) !bool {

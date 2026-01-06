@@ -95,21 +95,24 @@ fn handlePrompt(allocator: std.mem.Allocator, project_dir: []const u8, timestamp
     const config_path = try paths.getConfigPath(allocator, project_dir);
     defer allocator.free(config_path);
 
-    const config = config_mod.load(allocator, config_path) catch |err| {
+    var config = config_mod.load(allocator, config_path) catch |err| {
         // If config can't be loaded, use defaults
         if (err == error.FileNotFound) {
-            return handlePromptWithConfig(allocator, timestamp_file, config_mod.Config{});
+            var default_config = try config_mod.Config.init(allocator);
+            defer default_config.deinit();
+            return handlePromptWithConfig(allocator, timestamp_file, &default_config);
         }
         return err;
     };
+    defer config.deinit();
 
-    try handlePromptWithConfig(allocator, timestamp_file, config);
+    try handlePromptWithConfig(allocator, timestamp_file, &config);
 }
 
 fn handlePromptWithConfig(
     allocator: std.mem.Allocator,
     timestamp_file: []const u8,
-    config: config_mod.Config,
+    config: *const config_mod.Config,
 ) !void {
     // Check if idle time detection is enabled
     if (!config.idleTime.enabled) {

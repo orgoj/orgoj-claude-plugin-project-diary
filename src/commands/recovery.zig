@@ -604,7 +604,8 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const config_path = try paths.getConfigPath(allocator, project_root);
     defer allocator.free(config_path);
 
-    const config = config_mod.load(allocator, config_path) catch config_mod.Config{};
+    var config = config_mod.load(allocator, config_path) catch try config_mod.Config.init(allocator);
+    defer config.deinit();
 
     // Parse transcript
     var summary = try parseTranscript(allocator, transcript_path, config.recovery.limits);
