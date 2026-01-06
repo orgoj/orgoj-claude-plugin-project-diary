@@ -55,19 +55,27 @@ TIMESTAMP=$(date +%Y-%m-%d-%H-%M)
 FILENAME="${TIMESTAMP}-${SESSION_ID}.md"
 FILEPATH="${DIARY_DIR}/${FILENAME}"
 
-# Get script directory for calling recovery-generator.js
+# Get script directory for finding mopc binary
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 case "$HOOK_EVENT" in
   "pre-compact"|"session-end")
-    # Check node dependency
-    if ! command -v node &>/dev/null; then
-      echo "Error: node is required but not installed" >&2
-      exit 1
+    # Call mopc recovery with hook data via stdin
+    # Try to find mopc binary relative to hook script
+    MOPC_BIN="${SCRIPT_DIR}/../zig-out/bin/mopc"
+
+    if [ ! -f "$MOPC_BIN" ]; then
+      # Fallback: try global installation
+      MOPC_BIN="mopc"
+      if ! command -v mopc &>/dev/null; then
+        echo "Error: mopc binary not found at ${SCRIPT_DIR}/../zig-out/bin/mopc" >&2
+        echo "Please run 'zig build' to build the project" >&2
+        exit 1
+      fi
     fi
 
-    # Call recovery-generator.js with hook data via stdin
-    echo "$HOOK_DATA" | node "${SCRIPT_DIR}/recovery-generator.js"
+    # Pass hook data via stdin to mopc recovery command
+    echo "$HOOK_DATA" | "$MOPC_BIN" recovery
     ;;
 
   "session-start")

@@ -14,9 +14,19 @@ bin/
 
 hooks/
 ├── hooks.json           # Hook definitions (SessionStart, PreCompact, SessionEnd, Stop, UserPromptSubmit)
-├── diary-hook.sh        # Bash dispatcher - routes events to appropriate handlers
-├── time-tracker.sh      # Idle time detection - tracks time between responses
-└── recovery-generator.js # Node.js transcript parser - generates recovery markdown
+├── diary-hook.sh        # Bash dispatcher - routes events to mopc binary
+└── time-tracker.sh      # Idle time detection - tracks time between responses
+
+src/
+├── main.zig             # Main entry point - command dispatcher
+├── commands/
+│   ├── recovery.zig     # Zig transcript parser - generates recovery markdown
+│   ├── hook.zig         # Hook handler - session-start, pre-compact, session-end
+│   ├── tracker.zig      # Time tracker - stop, prompt events
+│   └── wrapper.zig      # Wrapper implementation
+└── shared/
+    ├── config.zig       # Configuration loading
+    └── paths.zig        # Path utilities
 
 commands/
 ├── diary.md             # /diary skill - manual session documentation
@@ -33,20 +43,21 @@ commands/
 4. After session ends → offers/auto `/diary` via `--resume $SESSION_ID`
 
 **Hook Flow:**
-1. **SessionStart** → `diary-hook.sh session-start` → outputs `<session-info>` with SESSION_ID
-2. **PreCompact/SessionEnd** → `diary-hook.sh pre-compact|session-end` → calls `recovery-generator.js`
-3. **recovery-generator.js** → parses JSONL transcript → writes `.claude/diary/recovery/*.md`
+1. **SessionStart** → `diary-hook.sh session-start` → calls `mopc hook session-start` → outputs `<session-info>` with SESSION_ID
+2. **PreCompact/SessionEnd** → `diary-hook.sh pre-compact|session-end` → calls `mopc recovery`
+3. **mopc recovery** (Zig) → parses JSONL transcript → writes `.claude/diary/recovery/*.md`
 4. **SessionStart (after compact)** → loads previous recovery into `<recovery-context>`
 5. **Stop** → `time-tracker.sh stop` → saves timestamp to `.claude/diary/timestamps/{SESSION_ID}.txt`
 6. **UserPromptSubmit** → `time-tracker.sh prompt` → checks idle time, injects note if threshold exceeded
 
-### Transcript Parsing (recovery-generator.js)
+### Transcript Parsing (src/commands/recovery.zig)
 
-Parses Claude Code's JSONL transcript format:
+Pure Zig implementation that parses Claude Code's JSONL transcript format:
 - Entry structure: `{ type: "user"|"assistant", message: { role, content } }`
 - User messages: `content` is string (prompts) or array (tool_result)
 - Assistant messages: `content` is array of `{ type: "text"|"tool_use", ... }`
 - Tool results link via `tool_use_id` to original `tool_use` blocks
+- No Node.js dependency - fully native Zig implementation
 
 ### Storage Locations
 
@@ -143,6 +154,15 @@ The wrapper uses `--session-id` and `--resume` to maintain context across comman
 
 ## Development
 
+### Building
+
+```bash
+# Build the Zig project
+zig build
+
+# Output: zig-out/bin/mopc
+```
+
 ### Testing Wrapper
 ```bash
 # Test wrapper with auto-reflect disabled
@@ -155,11 +175,14 @@ bin/claude-diary --model sonnet "fix the bug"
 ### Testing Hooks
 
 ```bash
+# Build first
+zig build
+
 # Test session start output
 echo '{"session_id":"test123","cwd":"/tmp","source":"startup"}' | bash hooks/diary-hook.sh --project-dir "/tmp" session-start
 
 # Test recovery generation (requires transcript)
-echo '{"session_id":"test123","cwd":"/tmp","transcript_path":"/path/to/transcript.jsonl"}' | node hooks/recovery-generator.js
+echo '{"session_id":"test123","cwd":"/tmp","transcript_path":"/path/to/transcript.jsonl"}' | zig-out/bin/mopc recovery
 
 # Test idle time tracking
 echo '{"session_id":"test456"}' | bash hooks/time-tracker.sh --project-dir "/tmp" stop
@@ -168,8 +191,8 @@ cat /tmp/.claude/diary/timestamps/test456.txt
 
 ### Requirements
 
-- Node.js (for recovery-generator.js)
-- jq (for JSON parsing in diary-hook.sh)
+- Zig (for building mopc binary)
+- jq (for JSON parsing in bash scripts)
 
 ## Plugin Conventions
 

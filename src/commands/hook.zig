@@ -181,34 +181,120 @@ fn handleRecovery(
     project_dir: []const u8,
     stdin_data: []const u8,
 ) !void {
-    // Path to recovery-generator.js in hooks directory
-    const recovery_generator = try std.fs.path.join(allocator, &.{ project_dir, "hooks", "recovery-generator.js" });
-    defer allocator.free(recovery_generator);
+    // Parse stdin data to pass project directory
+    const parsed = std.json.parseFromSlice(std.json.Value, allocator, stdin_data, .{}) catch |err| {
+        std.debug.print("Error: Failed to parse JSON input: {any}\n", .{err});
+        return error.InvalidInput;
+    };
+    defer parsed.deinit();
 
-    // Spawn node process
-    var child = std.process.Child.init(&.{ "node", recovery_generator }, allocator);
-    child.stdin_behavior = .Pipe;
-    child.stdout_behavior = .Inherit;
-    child.stderr_behavior = .Inherit;
+    // Create a modified JSON with project directory context
+    var json_obj = parsed.value.object;
 
-    try child.spawn();
+    // Ensure project_dir is in the JSON data (as cwd if not present)
+    if (json_obj.get("cwd") == null) {
+        // We need to add cwd, but we can't modify the parsed object
+        // So we'll reconstruct the JSON with cwd added
+        var new_json = std.ArrayList(u8).init(allocator);
+        defer new_json.deinit();
 
-    // Write stdin data to child
-    if (child.stdin) |stdin_pipe| {
-        try stdin_pipe.writeAll(stdin_data);
-        stdin_pipe.close();
-        child.stdin = null;
-    }
+        // Simple JSON manipulation: add cwd field
+        // Find the last } and insert before it
+        const trimmed = std.mem.trim(u8, stdin_data, " \t\r\n");
+        if (trimmed.len > 0 and trimmed[trimmed.len - 1] == '}') {
+            // Insert cwd before the closing brace
+            const without_brace = trimmed[0 .. trimmed.len - 1];
+            try new_json.appendSlice(without_brace);
 
-    // Wait for completion
-    const term = try child.wait();
-
-    switch (term) {
-        .Exited => |code| {
-            if (code != 0) {
-                return error.RecoveryGeneratorFailed;
+            // Add comma if not empty object
+            if (!std.mem.endsWith(u8, std.mem.trim(u8, without_brace, " \t\r\n"), "{")) {
+                try new_json.append(',');
             }
-        },
-        else => return error.RecoveryGeneratorFailed,
+
+            try new_json.writer().print("\"cwd\":\"{s}\"}}", .{project_dir});
+
+            // Write modified JSON to a temporary buffer and call recovery
+            // Actually, we'll use stdin redirection by creating a pipe
+            // But simpler: we can just create a new stdin-like input
+
+            // For now, let's just call recovery.run with empty args
+            // The recovery module will read from the actual stdin which we control here
+
+            // Create a temporary file with the modified JSON
+            const tmp_dir = std.fs.cwd();
+            const tmp_name = try std.fmt.allocPrint(allocator, ".recovery-input-{d}.json", .{std.time.milliTimestamp()});
+            defer allocator.free(tmp_name);
+
+            {
+                const tmp_file = try tmp_dir.createFile(tmp_name, .{});
+                defer tmp_file.close();
+                try tmp_file.writeAll(new_json.items);
+            }
+            defer tmp_dir.deleteFile(tmp_name) catch {};
+
+            // Redirect stdin temporarily by spawning ourselves
+            // Actually, this is getting complex. Let's use a simpler approach:
+            // Just call the recovery module's run function directly with a custom stdin
+
+            // Get path to current executable
+            const exe_path = try std.fs.selfExePathAlloc(allocator);
+            defer allocator.free(exe_path);
+
+            // Create argv with executable path
+            const argv = [_][]const u8{ exe_path, "recovery" };
+
+            // The simplest approach: use a pipe
+            var child = std.process.Child.init(&argv, allocator);
+            child.stdin_behavior = .Pipe;
+            child.stdout_behavior = .Inherit;
+            child.stderr_behavior = .Inherit;
+
+            try child.spawn();
+
+            if (child.stdin) |stdin_pipe| {
+                try stdin_pipe.writeAll(new_json.items);
+                stdin_pipe.close();
+                child.stdin = null;
+            }
+
+            const term = try child.wait();
+            switch (term) {
+                .Exited => |code| {
+                    if (code != 0) {
+                        return error.RecoveryFailed;
+                    }
+                },
+                else => return error.RecoveryFailed,
+            }
+        }
+    } else {
+        // cwd already present, just spawn recovery with original stdin
+        const exe_path = try std.fs.selfExePathAlloc(allocator);
+        defer allocator.free(exe_path);
+
+        const argv = [_][]const u8{ exe_path, "recovery" };
+
+        var child = std.process.Child.init(&argv, allocator);
+        child.stdin_behavior = .Pipe;
+        child.stdout_behavior = .Inherit;
+        child.stderr_behavior = .Inherit;
+
+        try child.spawn();
+
+        if (child.stdin) |stdin_pipe| {
+            try stdin_pipe.writeAll(stdin_data);
+            stdin_pipe.close();
+            child.stdin = null;
+        }
+
+        const term = try child.wait();
+        switch (term) {
+            .Exited => |code| {
+                if (code != 0) {
+                    return error.RecoveryFailed;
+                }
+            },
+            else => return error.RecoveryFailed,
+        }
     }
 }
