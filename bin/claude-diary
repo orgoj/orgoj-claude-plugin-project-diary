@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+# claude-diary - Wrapper for Claude Code with automatic diary management
+#
+# Features:
+# - Generates session ID for continuity
+# - Detects unprocessed diaries and offers /reflect
+# - Offers /diary at session end (runs in same session via --resume)
+# - Auto-mode support via config
+# - Permissions setup for automated commands
+
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Generate unique session ID (8 chars)
+SESSION_ID=$(head -c 6 /dev/urandom | base64 | tr -dc 'a-z0-9' | head -c 8)
+
+# Locate project root (find .claude directory)
+PROJECT_ROOT="$(pwd)"
+while [ "$PROJECT_ROOT" != "/" ]; do
+  if [ -d "$PROJECT_ROOT/.claude" ]; then
+    break
+  fi
+  PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
+done
+
+if [ ! -d "$PROJECT_ROOT/.claude" ]; then
+  PROJECT_ROOT="$(pwd)"
+fi
+
+DIARY_DIR="$PROJECT_ROOT/.claude/diary"
+CONFIG_FILE="$DIARY_DIR/.config.json"
+
+# Load wrapper config
+if [ -f "$CONFIG_FILE" ]; then
+  AUTO_DIARY=$(jq -r '.wrapper.autoDiary // false' "$CONFIG_FILE" 2>/dev/null || echo "false")
+  AUTO_REFLECT=$(jq -r '.wrapper.autoReflect // false' "$CONFIG_FILE" 2>/dev/null || echo "false")
+  ASK_DIARY=$(jq -r '.wrapper.askBeforeDiary // true' "$CONFIG_FILE" 2>/dev/null || echo "true")
+  ASK_REFLECT=$(jq -r '.wrapper.askBeforeReflect // true' "$CONFIG_FILE" 2>/dev/null || echo "true")
+else
+  # Defaults if no config
+  AUTO_DIARY="false"
+  AUTO_REFLECT="false"
+  ASK_DIARY="true"
+  ASK_REFLECT="true"
+fi
+
+# Setup temporary permissions for automated commands
+TEMP_SETTINGS="$PROJECT_ROOT/.claude/settings.local.json"
+cat > "$TEMP_SETTINGS" <<EOF
+{
+  "allowedTools": [
+    "SlashCommand(/diary)",
+    "SlashCommand(/reflect)",
+    "SlashCommand(/diary-config)",
+    "Edit",
+    "Write",
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash(git *)",
+    "Bash(jq *)",
+    "Bash(find *)",
+    "Bash(mkdir *)",
+    "Bash(cat *)"
+  ]
+}
+EOF
+
+# Cleanup function
+cleanup() {
+  rm -f "$TEMP_SETTINGS"
+}
+trap cleanup EXIT
+
+# Check for unprocessed diaries
+check_unprocessed() {
+  local recovery_count=0
+  local manual_count=0
+
+  if [ -d "$DIARY_DIR/recovery" ]; then
+    recovery_count=$(find "$DIARY_DIR/recovery" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+  fi
+
+  if [ -d "$DIARY_DIR" ]; then
+    manual_count=$(find "$DIARY_DIR" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+  fi
+
+  echo $((recovery_count + manual_count))
+}
+
+# Main flow
+echo -e "${BLUE}🚀 Claude Diary Wrapper${NC}"
+echo -e "${BLUE}   Session ID: ${SESSION_ID}${NC}"
+echo ""
+
+# [1] Check for unprocessed diaries
+UNPROCESSED_COUNT=$(check_unprocessed)
+
+if [ "$UNPROCESSED_COUNT" -gt 0 ]; then
+  echo -e "${YELLOW}📚 Found ${UNPROCESSED_COUNT} unprocessed diary file(s)${NC}"
+
+  RUN_REFLECT=false
+
+  if [ "$AUTO_REFLECT" = "true" ]; then
+    RUN_REFLECT=true
+    echo -e "${GREEN}🔄 Auto-running /reflect...${NC}"
+  elif [ "$ASK_REFLECT" = "true" ]; then
+    read -p "Run /reflect to process them? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      RUN_REFLECT=true
+    fi
+  fi
+
+  if [ "$RUN_REFLECT" = "true" ]; then
+    claude code /reflect
+    echo ""
+  fi
+fi
+
+# [2] Run main Claude session with session ID
+echo -e "${GREEN}💬 Starting Claude Code session...${NC}"
+echo ""
+
+claude code --session-id "$SESSION_ID" "$@"
+
+# [3] After session ends - offer /diary
+echo ""
+echo -e "${BLUE}📝 Session ended${NC}"
+
+RUN_DIARY=false
+
+if [ "$AUTO_DIARY" = "true" ]; then
+  RUN_DIARY=true
+  echo -e "${GREEN}📝 Auto-running /diary...${NC}"
+elif [ "$ASK_DIARY" = "true" ]; then
+  read -p "Create diary for this session? [Y/n] " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+    RUN_DIARY=true
+  fi
+fi
+
+if [ "$RUN_DIARY" = "true" ]; then
+  echo ""
+  claude code --resume "$SESSION_ID" /diary
+fi
+
+echo ""
+echo -e "${GREEN}✨ Done!${NC}"

@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.12.0] - 2026-01-06
+
+### Added
+- **Wrapper script (`bin/claude-diary`)** - automatic diary management for Claude sessions
+- Session ID generation and continuity using `--session-id` and `--resume` flags
+- Auto-detect unprocessed diaries on start → offers/auto `/reflect` in separate session
+- Auto-prompt for `/diary` at session end → runs in same session (maintains full context)
+- Wrapper config settings: `autoDiary`, `autoReflect`, `askBeforeDiary`, `askBeforeReflect`
+- Permission management via temporary `.claude/settings.local.json`
+- Pass-through support for all Claude CLI arguments
+
+### Changed
+- `/diary-config` now includes wrapper settings section
+- Documentation updated with wrapper usage examples and configuration
+
 ## [1.11.0] - 2026-01-05
 
 ### Fixed

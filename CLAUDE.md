@@ -9,6 +9,9 @@ A Claude Code plugin that provides project-local session diaries with automatic 
 ## Architecture
 
 ```
+bin/
+└── claude-diary         # Wrapper script - session management with auto-diary/reflect
+
 hooks/
 ├── hooks.json           # Hook definitions (SessionStart, PreCompact, SessionEnd, Stop, UserPromptSubmit)
 ├── diary-hook.sh        # Bash dispatcher - routes events to appropriate handlers
@@ -23,6 +26,13 @@ commands/
 
 ### Data Flow
 
+**Wrapper Flow (bin/claude-diary):**
+1. Generates unique SESSION_ID
+2. Checks unprocessed diaries → offers/auto `/reflect` in separate session
+3. Runs `claude code --session-id $SESSION_ID` (main interactive session)
+4. After session ends → offers/auto `/diary` via `--resume $SESSION_ID`
+
+**Hook Flow:**
 1. **SessionStart** → `diary-hook.sh session-start` → outputs `<session-info>` with SESSION_ID
 2. **PreCompact/SessionEnd** → `diary-hook.sh pre-compact|session-end` → calls `recovery-generator.js`
 3. **recovery-generator.js** → parses JSONL transcript → writes `.claude/diary/recovery/*.md`
@@ -51,7 +61,7 @@ Parses Claude Code's JSONL transcript format:
 
 ### Configuration
 
-Recovery generator and idle time detection can be configured via `.claude/diary/.config.json`:
+Recovery generator, idle time detection, and wrapper behavior can be configured via `.claude/diary/.config.json`:
 
 ```json
 {
@@ -66,8 +76,14 @@ Recovery generator and idle time detection can be configured via `.claude/diary/
     }
   },
   "idleTime": {
-    "enabled": false,
+    "enabled": true,
     "thresholdMinutes": 5
+  },
+  "wrapper": {
+    "autoDiary": false,
+    "autoReflect": false,
+    "askBeforeDiary": true,
+    "askBeforeReflect": true
   }
 }
 ```
@@ -80,9 +96,41 @@ Recovery generator and idle time detection can be configured via `.claude/diary/
 - **enabled**: Enable/disable idle time tracking (default: true)
 - **thresholdMinutes**: Minutes of idle time between Stop and UserPromptSubmit before notification is injected
 
-Use `/diary-config` to create config interactively.
+**Wrapper Settings (for bin/claude-diary):**
+- **autoDiary**: Automatically run `/diary` at session end without prompting (default: false)
+- **autoReflect**: Automatically run `/reflect` when unprocessed diaries found (default: false)
+- **askBeforeDiary**: Show prompt before running `/diary` (default: true)
+- **askBeforeReflect**: Show prompt before running `/reflect` (default: true)
+
+Use `/diary-config` to create/update config interactively.
+
+## Usage
+
+### Direct Claude CLI (manual diary)
+```bash
+claude code           # Normal session
+# Use /diary manually at end
+```
+
+### Wrapper (automatic diary management)
+```bash
+bin/claude-diary      # Session with auto diary prompts
+# Detects unprocessed → offers /reflect
+# At end → offers /diary in same session
+```
+
+The wrapper uses `--session-id` and `--resume` to maintain context across commands.
 
 ## Development
+
+### Testing Wrapper
+```bash
+# Test wrapper with auto-reflect disabled
+bin/claude-diary
+
+# Test with custom args
+bin/claude-diary --model sonnet "fix the bug"
+```
 
 ### Testing Hooks
 
@@ -108,6 +156,7 @@ cat /tmp/.claude/diary/timestamps/test456.txt
 - Filename format: `YYYY-MM-DD-HH-MM-SESSIONID.md`
 - Recovery files append with separator when same session compacts multiple times
 - Hook outputs use XML tags (`<session-info>`, `<recovery-context>`) for parsing
+- Wrapper generates 8-char session IDs and creates temporary `.claude/settings.local.json` for permissions
 
 ## User Preferences
 

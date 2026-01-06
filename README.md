@@ -9,6 +9,7 @@ A Claude Code plugin for project-local session diaries with reflection to CLAUDE
 - **Automatic recovery**: PreCompact/SessionEnd hooks parse transcript and generate recovery files
 - **Context restoration**: After compact, previous recovery content is loaded into context
 - **Idle time detection**: Notifies Claude when significant time passed between responses
+- **Wrapper script**: `bin/claude-diary` for automatic diary/reflect at session start/end
 - **Manual diary**: `/diary` command for structured session documentation
 - **Intelligent reflection**: `/reflect` analyzes patterns and updates CLAUDE.md
 - **Configurable recovery**: `/diary-config` to customize recovery limits and skip empty sessions
@@ -26,6 +27,44 @@ A Claude Code plugin for project-local session diaries with reflection to CLAUDE
 ```
 
 ## Usage
+
+### Wrapper Script (Recommended)
+
+Use `bin/claude-diary` wrapper for automatic diary management:
+
+```bash
+# Start Claude with automatic diary prompts
+bin/claude-diary
+
+# Pass arguments to Claude CLI
+bin/claude-diary --model sonnet "fix the bug"
+```
+
+**What it does:**
+1. **On start**: Checks for unprocessed diaries → offers/auto `/reflect`
+2. **During**: Runs normal Claude session with generated session ID
+3. **On end**: Offers/auto `/diary` in same session (maintains context)
+
+**Configuration** (via `/diary-config`):
+```json
+{
+  "wrapper": {
+    "autoDiary": false,        // Auto-run /diary without asking
+    "autoReflect": false,      // Auto-run /reflect without asking
+    "askBeforeDiary": true,    // Show prompt before /diary
+    "askBeforeReflect": true   // Show prompt before /reflect
+  }
+}
+```
+
+### Direct Claude CLI
+
+Run Claude normally and use commands manually:
+
+```bash
+claude code
+# Use /diary and /reflect manually
+```
 
 ### /diary [FILEPATH]
 
@@ -89,6 +128,7 @@ Configure recovery generator and idle time detection settings interactively.
 Creates `.claude/diary/.config.json` with settings for:
 - **Recovery settings**: minActivity, data limits (prompts, tool calls, errors, etc.)
 - **Idle time detection**: Enable/disable, threshold in minutes
+- **Wrapper settings**: Auto-modes and prompts for `bin/claude-diary`
 
 ## How It Works
 
@@ -167,7 +207,10 @@ Extracted from transcript JSONL:
 
 ```
 your-project/
+├── bin/
+│   └── claude-diary                       # Wrapper script (optional)
 ├── .claude/
+│   ├── settings.local.json                # Temp permissions (wrapper only)
 │   └── diary/
 │       ├── .config.json                   # Optional config (/diary-config)
 │       ├── 2025-12-31-14-30-abc123.md     # Manual diary (/diary command)
