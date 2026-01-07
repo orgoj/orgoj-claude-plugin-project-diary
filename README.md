@@ -30,16 +30,39 @@ A Claude Code plugin for project-local session diaries with reflection to CLAUDE
 
 ## Usage
 
-### Wrapper Script (Recommended)
+### mopc CLI
 
-Use `bin/claude-diary` wrapper for automatic diary management:
+The plugin provides `mopc` command-line tool for direct access to all features.
+
+**Installation:**
+```bash
+# Add plugin bin/ to PATH (one-time setup)
+./scripts/install.sh
+
+# Or add manually to ~/.bashrc or ~/.zshrc:
+export PATH="/path/to/plugin/bin:$PATH"
+```
+
+**Available commands:**
+```bash
+mopc --version                    # Show version
+mopc wrapper [OPTIONS]            # Run wrapper with diary management
+mopc test-config /path            # Test config cascade
+mopc recovery                     # Generate recovery manually
+mopc hook session-start           # Hook commands (used internally)
+mopc tracker stop                 # Time tracking commands
+```
+
+### Wrapper Mode (Recommended)
+
+Use `mopc wrapper` for automatic diary management:
 
 ```bash
 # Start Claude with automatic diary prompts
-bin/claude-diary
+mopc wrapper
 
-# Pass arguments to Claude CLI
-bin/claude-diary --model sonnet "fix the bug"
+# Pass arguments to Claude CLI (after --)
+mopc wrapper -- --model sonnet "fix the bug"
 ```
 
 **What it does:**
@@ -64,8 +87,8 @@ bin/claude-diary --model sonnet "fix the bug"
 **CLI Options:**
 ```bash
 # Wrapper options (before --), Claude options (after --)
-bin/claude-diary --min-session-size 10 -- --model sonnet
-bin/claude-diary --min-diary-count 3 --auto-reflect -- "fix bug"
+mopc wrapper --min-session-size 10 -- --model sonnet
+mopc wrapper --min-diary-count 3 --auto-reflect -- "fix bug"
 ```
 
 ### Direct Claude CLI

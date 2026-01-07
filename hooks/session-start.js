@@ -33,7 +33,8 @@ const ext = os === 'windows' ? '.exe' : '';
 
 // Paths
 const pluginRoot = path.resolve(__dirname, '..');
-const targetBin = path.join(pluginRoot, 'hooks', `mopc${ext}`);
+const hooksTarget = path.join(pluginRoot, 'hooks', `mopc${ext}`);
+const binTarget = path.join(pluginRoot, 'bin', `mopc${ext}`);
 
 // Prefer dev build (zig-out/bin/mopc) if exists, otherwise use platform-specific
 const devBin = path.join(pluginRoot, 'zig-out', 'bin', `mopc${ext}`);
@@ -53,29 +54,34 @@ if (fs.existsSync(devBin)) {
   process.exit(1);
 }
 
-// Remove old symlink/file if exists
-if (fs.existsSync(targetBin)) {
-  try {
-    fs.unlinkSync(targetBin);
-  } catch (err) {
-    // Ignore errors
-  }
-}
+// Create symlinks for both hooks/mopc and bin/mopc
+const targets = [hooksTarget, binTarget];
 
-// Create symlink (or copy on Windows if symlink fails)
-try {
-  if (os === 'windows') {
-    // On Windows, copy the file (symlinks require admin rights)
-    fs.copyFileSync(sourceBin, targetBin);
-  } else {
-    // On Unix, create symlink
-    fs.symlinkSync(sourceBin, targetBin);
-    // Make executable
-    fs.chmodSync(targetBin, 0o755);
+for (const targetBin of targets) {
+  // Remove old symlink/file if exists
+  if (fs.existsSync(targetBin)) {
+    try {
+      fs.unlinkSync(targetBin);
+    } catch (err) {
+      // Ignore errors
+    }
   }
-} catch (err) {
-  console.error(`Failed to setup mopc: ${err.message}`);
-  process.exit(1);
+
+  // Create symlink (or copy on Windows if symlink fails)
+  try {
+    if (os === 'windows') {
+      // On Windows, copy the file (symlinks require admin rights)
+      fs.copyFileSync(sourceBin, targetBin);
+    } else {
+      // On Unix, create symlink
+      fs.symlinkSync(sourceBin, targetBin);
+      // Make executable
+      fs.chmodSync(targetBin, 0o755);
+    }
+  } catch (err) {
+    console.error(`Failed to setup mopc at ${targetBin}: ${err.message}`);
+    process.exit(1);
+  }
 }
 
 // Read stdin for session context
@@ -100,7 +106,7 @@ process.stdin.on('end', () => {
   const mopcArgs = ['hook', 'session-start', ...args];
 
   try {
-    const output = execSync(`"${targetBin}" ${mopcArgs.map(a => `"${a}"`).join(' ')}`, {
+    const output = execSync(`"${hooksTarget}" ${mopcArgs.map(a => `"${a}"`).join(' ')}`, {
       input: stdinData,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'inherit']

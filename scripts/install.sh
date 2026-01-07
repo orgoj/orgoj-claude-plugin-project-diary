@@ -1,11 +1,12 @@
 #!/bin/bash
 # Installation script for mopc
-# Creates symlink in ~/.local/bin/ so mopc is available system-wide
+# Adds plugin bin/ directory to PATH
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BIN_DIR="$PROJECT_ROOT/bin"
 
 echo "📦 Installing mopc..."
 echo ""
@@ -39,7 +40,7 @@ if [ "$OS" = "windows" ]; then
     EXT=".exe"
 fi
 
-# Check if platform binary exists (marketplace)
+# Check if platform binary exists
 PLATFORM_BIN="$PROJECT_ROOT/zig-out/bin/$PLATFORM/mopc$EXT"
 DEV_BIN="$PROJECT_ROOT/zig-out/bin/mopc$EXT"
 
@@ -49,46 +50,35 @@ if [ ! -f "$PLATFORM_BIN" ] && [ ! -f "$DEV_BIN" ]; then
     exit 1
 fi
 
-if [ -f "$DEV_BIN" ]; then
-    echo "ℹ️  Using dev build: zig-out/bin/mopc$EXT"
-    echo "   (For production, run: ./scripts/build-all-platforms.sh)"
-    echo ""
+# Run SessionStart to create bin/mopc symlink
+echo "🔗 Creating bin/mopc symlink..."
+echo '{"session_id":"install","cwd":"'$(pwd)'"}' | node "$PROJECT_ROOT/hooks/session-start.js" --project-dir "$PROJECT_ROOT" > /dev/null 2>&1
+
+if [ ! -f "$BIN_DIR/mopc$EXT" ]; then
+    echo "❌ Failed to create bin/mopc"
+    exit 1
 fi
 
-# Create ~/.local/bin if it doesn't exist
-LOCAL_BIN="$HOME/.local/bin"
-mkdir -p "$LOCAL_BIN"
-
-# Create symlink
-SOURCE="$PROJECT_ROOT/bin/mopc"
-TARGET="$LOCAL_BIN/mopc"
-
-# Remove old symlink if exists
-if [ -e "$TARGET" ] || [ -L "$TARGET" ]; then
-    rm -f "$TARGET"
-fi
-
-ln -s "$SOURCE" "$TARGET"
-chmod +x "$SOURCE"
-
-echo "✅ Installed: $TARGET -> $SOURCE"
+echo "✅ Created: bin/mopc$EXT"
 echo ""
 
-# Check if ~/.local/bin is in PATH
-if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
-    echo "⚠️  WARNING: $LOCAL_BIN is not in your PATH"
-    echo ""
-    echo "Add this to your ~/.bashrc or ~/.zshrc:"
-    echo '  export PATH="$HOME/.local/bin:$PATH"'
-    echo ""
-    echo "Then reload your shell:"
-    echo "  source ~/.bashrc  # or ~/.zshrc"
-    echo ""
-else
+# Check if bin/ is in PATH
+if [[ ":$PATH:" == *":$BIN_DIR:"* ]]; then
     echo "🎉 Installation complete!"
     echo ""
     echo "Try it:"
     echo "  mopc --version"
-    echo "  mopc --help"
+    echo ""
+else
+    echo "⚠️  Add plugin bin/ directory to your PATH"
+    echo ""
+    echo "Add this to your ~/.bashrc or ~/.zshrc:"
+    echo "  export PATH=\"$BIN_DIR:\$PATH\""
+    echo ""
+    echo "Then reload your shell:"
+    echo "  source ~/.bashrc  # or ~/.zshrc"
+    echo ""
+    echo "Or run commands directly:"
+    echo "  $BIN_DIR/mopc --version"
     echo ""
 fi

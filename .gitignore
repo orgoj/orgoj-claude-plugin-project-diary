@@ -25,6 +25,8 @@ zig-out/bin/mopc.exe
 /tmp/mopc-test-*
 tests/fixtures/
 
-# Temporary platform-specific symlink (created by SessionStart hook)
+# Temporary platform-specific symlinks (created by SessionStart hook)
 hooks/mopc
 hooks/mopc.exe
+bin/mopc
+bin/mopc.exe
