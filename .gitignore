@@ -5,3 +5,5 @@ zig-cache/
 
 # Test artifacts
 /tmp/zig-test/
+/tmp/mopc-test-*
+tests/fixtures/
