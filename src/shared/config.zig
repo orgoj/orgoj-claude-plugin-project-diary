@@ -165,22 +165,73 @@ pub fn loadSingle(allocator: std.mem.Allocator, path: []const u8) !Config {
 /// Merge two configs - project overrides home
 pub fn mergeConfigs(allocator: std.mem.Allocator, home: Config, project: Config) !Config {
     var result = try Config.init(allocator);
+    errdefer result.deinit();
+
+    // Free the default claude config before replacing it
+    result.claude.deinit();
 
     // Merge claude config
     result.claude = try mergeClaudeConfig(allocator, home.claude, project.claude);
 
-    // For simple structs, project takes precedence if any field is non-default
-    // For now, use project values (could implement field-by-field merging if needed)
-    result.wrapper = project.wrapper;
-    result.recovery = project.recovery;
-    result.idleTime = project.idleTime;
+    // Merge wrapper config field-by-field
+    result.wrapper = mergeWrapperConfig(home.wrapper, project.wrapper);
+
+    // Merge recovery config field-by-field
+    result.recovery = mergeRecoveryConfig(home.recovery, project.recovery);
+
+    // Merge idle time config field-by-field
+    result.idleTime = mergeIdleTimeConfig(home.idleTime, project.idleTime);
 
     return result;
+}
+
+/// Merge two WrapperConfig structs - uses non-default values from project, otherwise home
+fn mergeWrapperConfig(home: WrapperConfig, project: WrapperConfig) WrapperConfig {
+    const defaults = WrapperConfig{};
+    return .{
+        .autoDiary = if (project.autoDiary != defaults.autoDiary) project.autoDiary else home.autoDiary,
+        .autoReflect = if (project.autoReflect != defaults.autoReflect) project.autoReflect else home.autoReflect,
+        .askBeforeDiary = if (project.askBeforeDiary != defaults.askBeforeDiary) project.askBeforeDiary else home.askBeforeDiary,
+        .askBeforeReflect = if (project.askBeforeReflect != defaults.askBeforeReflect) project.askBeforeReflect else home.askBeforeReflect,
+        .minSessionSize = if (project.minSessionSize != defaults.minSessionSize) project.minSessionSize else home.minSessionSize,
+        .minDiaryCount = if (project.minDiaryCount != defaults.minDiaryCount) project.minDiaryCount else home.minDiaryCount,
+    };
+}
+
+/// Merge two RecoveryConfig structs - uses non-default values from project, otherwise home
+fn mergeRecoveryConfig(home: RecoveryConfig, project: RecoveryConfig) RecoveryConfig {
+    const defaults = RecoveryConfig{};
+    return .{
+        .minActivity = if (project.minActivity != defaults.minActivity) project.minActivity else home.minActivity,
+        .limits = mergeRecoveryLimits(home.limits, project.limits),
+    };
+}
+
+/// Merge two RecoveryLimits structs - uses non-default values from project, otherwise home
+fn mergeRecoveryLimits(home: RecoveryLimits, project: RecoveryLimits) RecoveryLimits {
+    const defaults = RecoveryLimits{};
+    return .{
+        .userPrompts = if (project.userPrompts != defaults.userPrompts) project.userPrompts else home.userPrompts,
+        .promptLength = if (project.promptLength != defaults.promptLength) project.promptLength else home.promptLength,
+        .toolCalls = if (project.toolCalls != defaults.toolCalls) project.toolCalls else home.toolCalls,
+        .lastMessageLength = if (project.lastMessageLength != defaults.lastMessageLength) project.lastMessageLength else home.lastMessageLength,
+        .errors = if (project.errors != defaults.errors) project.errors else home.errors,
+    };
+}
+
+/// Merge two IdleTimeConfig structs - uses non-default values from project, otherwise home
+fn mergeIdleTimeConfig(home: IdleTimeConfig, project: IdleTimeConfig) IdleTimeConfig {
+    const defaults = IdleTimeConfig{};
+    return .{
+        .enabled = if (project.enabled != defaults.enabled) project.enabled else home.enabled,
+        .thresholdMinutes = if (project.thresholdMinutes != defaults.thresholdMinutes) project.thresholdMinutes else home.thresholdMinutes,
+    };
 }
 
 /// Merge two ClaudeConfig structs - project overrides home
 fn mergeClaudeConfig(allocator: std.mem.Allocator, home: ClaudeConfig, project: ClaudeConfig) !ClaudeConfig {
     var result = try ClaudeConfig.init(allocator);
+    errdefer result.deinit();
 
     // Use project cmd if different from default, otherwise use home
     allocator.free(result.cmd); // Free the default value first
@@ -629,6 +680,114 @@ fn parseIdleTimeConfig(value: std.json.Value) !IdleTimeConfig {
     }
 
     return config;
+}
+
+/// Find all .mopc-config.json files between home and project directory.
+/// Returns paths in top-down order (from home toward project).
+fn findParentConfigs(allocator: std.mem.Allocator, project_dir: []const u8) ![][]const u8 {
+    const home = std.posix.getenv("HOME") orelse return &[_][]const u8{};
+
+    var paths = std.ArrayList([]const u8).init(allocator);
+    errdefer {
+        for (paths.items) |p| allocator.free(p);
+        paths.deinit();
+    }
+
+    // Resolve project_dir to absolute path
+    var path_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+    const abs_project = std.fs.cwd().realpath(project_dir, &path_buf) catch project_dir;
+
+    // Start from project_dir's parent (not project_dir itself)
+    var current = std.fs.path.dirname(abs_project) orelse return paths.toOwnedSlice();
+
+    while (true) {
+        // If we reached home, stop (don't check home for .mopc-config.json)
+        if (std.mem.eql(u8, current, home)) break;
+
+        // If current is shorter than home, we've gone too far up
+        if (current.len < home.len) {
+            // Check if we're actually above home (not a sibling path)
+            const is_above = !std.mem.startsWith(u8, home, current);
+            if (is_above) break;
+        }
+
+        // Check for .mopc-config.json in current directory
+        const config_path = try std.fs.path.join(allocator, &.{ current, ".mopc-config.json" });
+        errdefer allocator.free(config_path);
+
+        // Try to access the file
+        std.fs.cwd().access(config_path, .{}) catch {
+            allocator.free(config_path);
+
+            // Move to parent
+            current = std.fs.path.dirname(current) orelse break;
+            continue;
+        };
+
+        // File exists, add to list
+        try paths.append(config_path);
+
+        // Move to parent
+        current = std.fs.path.dirname(current) orelse break;
+    }
+
+    // Reverse to get top-down order (from home toward project)
+    std.mem.reverse([]const u8, paths.items);
+
+    return paths.toOwnedSlice();
+}
+
+/// Load configuration with cascade: home -> parent dirs -> project
+/// Config files are merged in order, with later configs overriding earlier ones.
+pub fn loadCascadedConfig(allocator: std.mem.Allocator, project_dir: []const u8) !Config {
+    // 1. Load home config (or default if not found)
+    var config = loadHomeConfig(allocator) catch |err| blk: {
+        if (err == error.FileNotFound) {
+            break :blk try Config.init(allocator);
+        }
+        return err;
+    };
+    errdefer config.deinit();
+
+    // 2. Find and merge parent configs (.mopc-config.json files)
+    const parent_configs = try findParentConfigs(allocator, project_dir);
+    defer {
+        for (parent_configs) |p| allocator.free(p);
+        allocator.free(parent_configs);
+    }
+
+    for (parent_configs) |config_path| {
+        var parent_config = loadSingle(allocator, config_path) catch |err| {
+            // Skip unreadable or unparseable files, continue with others
+            if (err == error.FileNotFound or
+                err == error.AccessDenied or
+                err == error.InvalidJson)
+            {
+                continue;
+            }
+            return err;
+        };
+        defer parent_config.deinit();
+
+        const merged = try mergeConfigs(allocator, config, parent_config);
+        config.deinit();
+        config = merged;
+    }
+
+    // 3. Load and merge project config
+    var project_config = loadProjectConfig(allocator, project_dir) catch |err| {
+        // If project config not found or invalid, return current config
+        if (err == error.FileNotFound or err == error.InvalidJson) {
+            return config;
+        }
+        return err;
+    };
+    defer project_config.deinit();
+
+    const final = try mergeConfigs(allocator, config, project_config);
+    config.deinit();
+
+    return final;
 }
 
 /// Legacy function for backward compatibility - loads single config file

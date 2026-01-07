@@ -30,14 +30,8 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     const project_root = try findProjectRoot(allocator);
     defer allocator.free(project_root);
 
-    // Load merged config (home + project)
-    var home_config = try config_mod.loadHomeConfig(allocator);
-    defer home_config.deinit();
-
-    var project_config = try config_mod.loadProjectConfig(allocator, project_root);
-    defer project_config.deinit();
-
-    var config = try config_mod.mergeConfigs(allocator, home_config, project_config);
+    // Load cascaded config (home → parent dirs → project)
+    var config = try config_mod.loadCascadedConfig(allocator, project_root);
     defer config.deinit();
 
     // Merge config with CLI args

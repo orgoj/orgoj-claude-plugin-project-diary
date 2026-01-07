@@ -72,7 +72,28 @@ Pure Zig implementation that parses Claude Code's JSONL transcript format:
 
 ### Configuration
 
-Recovery generator, idle time detection, and wrapper behavior can be configured via `.claude/diary/.config.json`:
+**Config Cascade System:**
+
+Configurations are loaded and merged in hierarchical order:
+
+1. **Home config** (`~/.config/mopc/config.json`) - Global defaults
+2. **Intermediate configs** (`.mopc-config.json` files in parent directories) - Per-workspace/organization settings
+3. **Project config** (`.claude/diary/.config.json`) - Project-specific overrides
+
+Example hierarchy:
+```
+~/.config/mopc/config.json           # home: recovery.minActivity = 2
+~/work/.mopc-config.json             # work: wrapper.autoDiary = true
+~/work/wdt/.mopc-config.json         # wdt: wrapper.minSessionSize = 30
+~/work/wdt/projekty/                 # no config (inherits from wdt)
+~/work/wdt/projekty/project1/.claude/diary/.config.json  # project overrides
+```
+
+Configs are merged field-by-field, with later configs overriding earlier ones. Missing files are skipped gracefully.
+
+**Config Format:**
+
+Recovery generator, idle time detection, and wrapper behavior can be configured:
 
 ```json
 {
@@ -97,6 +118,35 @@ Recovery generator, idle time detection, and wrapper behavior can be configured 
     "askBeforeReflect": true,
     "minSessionSize": 2,
     "minDiaryCount": 1
+  }
+}
+```
+
+**Claude Execution Settings:**
+- **cmd**: Command to execute (default: "claude")
+- **env**: Environment variables for Claude execution
+  - Literal values: `"MY_VAR": "value"`
+  - References: `"PATH": "$PATH:/custom"` (expands from current environment)
+  - Unset: `"REMOVE_VAR": null` (removes variable)
+- **tmux**: Optional tmux session name (wrapper detects and uses tmux if available)
+- **override**: Per-command overrides for `reflect`, `main`, and `diary` invocations
+
+Example Claude config:
+```json
+{
+  "claude": {
+    "cmd": "happy",
+    "env": {
+      "API_KEY": "$HOME_API_KEY",
+      "DEBUG": null
+    },
+    "tmux": "cc-main",
+    "override": {
+      "reflect": {
+        "cmd": "claude",
+        "tmux": "cc-reflect"
+      }
+    }
   }
 }
 ```
@@ -187,6 +237,9 @@ echo '{"session_id":"test123","cwd":"/tmp","transcript_path":"/path/to/transcrip
 # Test idle time tracking
 echo '{"session_id":"test456"}' | bash hooks/time-tracker.sh --project-dir "/tmp" stop
 cat /tmp/.claude/diary/timestamps/test456.txt
+
+# Test config cascade
+zig-out/bin/mopc test-config /path/to/project
 ```
 
 ### Requirements

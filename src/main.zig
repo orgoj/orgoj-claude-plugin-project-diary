@@ -32,6 +32,9 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, command, "recovery")) {
         const recovery = @import("commands/recovery.zig");
         try recovery.run(allocator, args[2..]);
+    } else if (std.mem.eql(u8, command, "test-config")) {
+        const test_config = @import("commands/test-config.zig");
+        try test_config.run(allocator, args[2..]);
     } else {
         std.debug.print("Unknown command: {s}\n\n", .{command});
         try printUsage();
@@ -49,6 +52,7 @@ fn printUsage() !void {
         \\  mopc hook [session-start|pre-compact|session-end] [OPTIONS]
         \\  mopc tracker [stop|prompt] [OPTIONS]
         \\  mopc recovery [OPTIONS]
+        \\  mopc test-config [PROJECT_DIR]
         \\  mopc --version
         \\
     );
