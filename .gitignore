@@ -1,7 +1,18 @@
-# Zig build artifacts
-zig-out/
+# Zig cache artifacts (but keep platform binaries in zig-out/bin/)
 zig-cache/
 .zig-cache/
+
+# Zig build artifacts (except platform binaries)
+zig-out/*
+!zig-out/bin/
+zig-out/bin/*
+!zig-out/bin/linux-x64/
+!zig-out/bin/linux-arm64/
+!zig-out/bin/darwin-x64/
+!zig-out/bin/darwin-arm64/
+!zig-out/bin/windows-x64/
+!zig-out/bin/**/*.exe
+!zig-out/bin/**/mopc
 
 # Test artifacts
 /tmp/zig-test/

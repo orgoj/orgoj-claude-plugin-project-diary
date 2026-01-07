@@ -432,7 +432,10 @@ fn countUnprocessedDiaries(diary_dir: []const u8) !u32 {
 
 fn getSessionSize(allocator: std.mem.Allocator, project_root: []const u8, session_id: []const u8) !u64 {
     // Build transcript path: ~/.claude/projects/{project_name}/{session_id}.jsonl
-    const home = std.posix.getenv("HOME") orelse return 0;
+    const builtin = @import("builtin");
+    const home_env = if (builtin.os.tag == .windows) "USERPROFILE" else "HOME";
+    const home = std.process.getEnvVarOwned(allocator, home_env) catch return 0;
+    defer allocator.free(home);
 
     // Convert project_root to project_name (replace / with -)
     var project_name = std.ArrayList(u8).init(allocator);

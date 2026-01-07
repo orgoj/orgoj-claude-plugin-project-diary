@@ -1,4 +1,10 @@
 const std = @import("std");
+const builtin = @import("builtin");
+
+/// Get home directory environment variable name for current platform
+fn homeEnvVar() []const u8 {
+    return if (builtin.os.tag == .windows) "USERPROFILE" else "HOME";
+}
 
 /// Environment variable value - can be literal, unset (null), or reference ($VAR)
 pub const EnvValue = union(enum) {
@@ -129,7 +135,10 @@ pub const Config = struct {
 
 /// Load configuration from home directory (~/.config/mopc/config.json)
 pub fn loadHomeConfig(allocator: std.mem.Allocator) !Config {
-    const home = std.posix.getenv("HOME") orelse return try Config.init(allocator);
+    const home = std.process.getEnvVarOwned(allocator, homeEnvVar()) catch {
+        return try Config.init(allocator);
+    };
+    defer allocator.free(home);
 
     const path = try std.fs.path.join(allocator, &.{ home, ".config", "mopc", "config.json" });
     defer allocator.free(path);
@@ -685,7 +694,10 @@ fn parseIdleTimeConfig(value: std.json.Value) !IdleTimeConfig {
 /// Find all .mopc-config.json files between home and project directory.
 /// Returns paths in top-down order (from home toward project).
 fn findParentConfigs(allocator: std.mem.Allocator, project_dir: []const u8) ![][]const u8 {
-    const home = std.posix.getenv("HOME") orelse return &[_][]const u8{};
+    const home = std.process.getEnvVarOwned(allocator, homeEnvVar()) catch {
+        return &[_][]const u8{};
+    };
+    defer allocator.free(home);
 
     var paths = std.ArrayList([]const u8).init(allocator);
     errdefer {

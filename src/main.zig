@@ -8,35 +8,59 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (args.len < 2) {
+    // Detect command from argv[0] (symlink name) if called via symlink
+    const exe_name = std.fs.path.basename(args[0]);
+    const implied_command: ?[]const u8 = if (std.mem.eql(u8, exe_name, "claude-diary"))
+        "wrapper"
+    else if (std.mem.eql(u8, exe_name, "diary-hook.sh"))
+        "hook"
+    else if (std.mem.eql(u8, exe_name, "time-tracker.sh"))
+        "tracker"
+    else
+        null;
+
+    // If command implied by symlink, insert it into args
+    const command = if (implied_command) |cmd|
+        cmd
+    else if (args.len >= 2)
+        args[1]
+    else
+        null;
+
+    if (command == null) {
         try printUsage();
         return;
     }
 
-    const command = args[1];
+    const cmd = command.?;
 
-    if (std.mem.eql(u8, command, "--version") or std.mem.eql(u8, command, "-v")) {
+    // If command was implied, use all args starting from index 1
+    // If command was explicit, use args starting from index 2
+    const cmd_args = if (implied_command != null) args[1..] else args[2..];
+
+    // Handle --version flag
+    if (args.len >= 2 and (std.mem.eql(u8, args[1], "--version") or std.mem.eql(u8, args[1], "-v"))) {
         std.debug.print("mopc v0.1.0 - Master of Prompts\n", .{});
         return;
     }
 
-    if (std.mem.eql(u8, command, "wrapper")) {
+    if (std.mem.eql(u8, cmd, "wrapper")) {
         const wrapper = @import("commands/wrapper.zig");
-        try wrapper.run(allocator, args[2..]);
-    } else if (std.mem.eql(u8, command, "hook")) {
+        try wrapper.run(allocator, cmd_args);
+    } else if (std.mem.eql(u8, cmd, "hook")) {
         const hook = @import("commands/hook.zig");
-        try hook.run(allocator, args[2..]);
-    } else if (std.mem.eql(u8, command, "tracker")) {
+        try hook.run(allocator, cmd_args);
+    } else if (std.mem.eql(u8, cmd, "tracker")) {
         const tracker = @import("commands/tracker.zig");
-        try tracker.run(allocator, args[2..]);
-    } else if (std.mem.eql(u8, command, "recovery")) {
+        try tracker.run(allocator, cmd_args);
+    } else if (std.mem.eql(u8, cmd, "recovery")) {
         const recovery = @import("commands/recovery.zig");
-        try recovery.run(allocator, args[2..]);
-    } else if (std.mem.eql(u8, command, "test-config")) {
+        try recovery.run(allocator, cmd_args);
+    } else if (std.mem.eql(u8, cmd, "test-config")) {
         const test_config = @import("commands/test-config.zig");
-        try test_config.run(allocator, args[2..]);
+        try test_config.run(allocator, cmd_args);
     } else {
-        std.debug.print("Unknown command: {s}\n\n", .{command});
+        std.debug.print("Unknown command: {s}\n\n", .{cmd});
         try printUsage();
         std.process.exit(1);
     }

@@ -1,6 +1,8 @@
-# Project Diary Plugin
+# Project Diary Plugin (Master of Prompts)
 
 A Claude Code plugin for project-local session diaries with reflection to CLAUDE.md.
+
+**Powered by mopc (Master of Prompts)** - a cross-platform Zig binary with zero runtime dependencies.
 
 ## Features
 
@@ -217,7 +219,8 @@ Extracted from transcript JSONL:
 ```
 your-project/
 ├── bin/
-│   └── claude-diary                       # Wrapper script (optional)
+│   ├── claude-diary                       # Wrapper symlink (optional)
+│   └── mopc-wrapper                       # Platform detection wrapper
 ├── .claude/
 │   ├── settings.local.json                # Temp permissions (wrapper only)
 │   └── diary/
@@ -239,8 +242,10 @@ your-project/
 ## Requirements
 
 - Claude Code CLI
-- Node.js (for transcript parsing)
-- `jq` (for JSON processing in hooks)
+- **No runtime dependencies required!**
+  - Pre-compiled binaries included for Linux (x64/ARM64), macOS (Intel/Apple Silicon), and Windows
+  - Native Zig binary with built-in JSONL parser
+  - No Node.js, Bash, or jq needed
 
 ## Credits
 

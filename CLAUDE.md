@@ -8,25 +8,38 @@ A Claude Code plugin that provides project-local session diaries with automatic 
 
 ## Architecture
 
+**Master of Prompts (mopc)** - Single cross-platform Zig binary with zero runtime dependencies.
+
 ```
 bin/
-└── claude-diary         # Wrapper script - session management with auto-diary/reflect
+├── claude-diary         # Symlink to mopc-wrapper
+└── mopc-wrapper         # Platform detection wrapper (bash) - selects correct binary
 
 hooks/
 ├── hooks.json           # Hook definitions (SessionStart, PreCompact, SessionEnd, Stop, UserPromptSubmit)
-├── diary-hook.sh        # Bash dispatcher - routes events to mopc binary
-└── time-tracker.sh      # Idle time detection - tracks time between responses
+├── diary-hook.sh        # Symlink to mopc-wrapper
+└── time-tracker.sh      # Symlink to mopc-wrapper
+
+zig-out/bin/             # Pre-compiled binaries for all platforms
+├── linux-x64/mopc
+├── linux-arm64/mopc
+├── darwin-x64/mopc      # macOS Intel
+├── darwin-arm64/mopc    # macOS Apple Silicon
+└── windows-x64/mopc.exe
 
 src/
-├── main.zig             # Main entry point - command dispatcher
+├── main.zig             # Main entry point - command dispatcher with argv[0] detection
 ├── commands/
-│   ├── recovery.zig     # Zig transcript parser - generates recovery markdown
+│   ├── recovery.zig     # Native JSONL transcript parser - generates recovery markdown
 │   ├── hook.zig         # Hook handler - session-start, pre-compact, session-end
 │   ├── tracker.zig      # Time tracker - stop, prompt events
 │   └── wrapper.zig      # Wrapper implementation
 └── shared/
-    ├── config.zig       # Configuration loading
+    ├── config.zig       # Configuration loading with cascade
     └── paths.zig        # Path utilities
+
+scripts/
+└── build-all-platforms.sh  # Cross-compile for all platforms
 
 commands/
 ├── diary.md             # /diary skill - manual session documentation
@@ -43,12 +56,12 @@ commands/
 4. After session ends → offers/auto `/diary` via `--resume $SESSION_ID`
 
 **Hook Flow:**
-1. **SessionStart** → `diary-hook.sh session-start` → calls `mopc hook session-start` → outputs `<session-info>` with SESSION_ID
-2. **PreCompact/SessionEnd** → `diary-hook.sh pre-compact|session-end` → calls `mopc recovery`
-3. **mopc recovery** (Zig) → parses JSONL transcript → writes `.claude/diary/recovery/*.md`
+1. **SessionStart** → `hooks/diary-hook.sh` (symlink) → `bin/mopc-wrapper` → platform binary `mopc hook session-start` → outputs `<session-info>`
+2. **PreCompact/SessionEnd** → wrapper selects platform binary → `mopc recovery`
+3. **mopc recovery** (native Zig) → parses JSONL transcript → writes `.claude/diary/recovery/*.md`
 4. **SessionStart (after compact)** → loads previous recovery into `<recovery-context>`
-5. **Stop** → `time-tracker.sh stop` → saves timestamp to `.claude/diary/timestamps/{SESSION_ID}.txt`
-6. **UserPromptSubmit** → `time-tracker.sh prompt` → checks idle time, injects note if threshold exceeded
+5. **Stop** → `hooks/time-tracker.sh` (symlink) → wrapper → `mopc tracker stop` → saves timestamp
+6. **UserPromptSubmit** → wrapper → `mopc tracker prompt` → checks idle time, injects note if threshold exceeded
 
 ### Transcript Parsing (src/commands/recovery.zig)
 
@@ -207,10 +220,13 @@ The wrapper uses `--session-id` and `--resume` to maintain context across comman
 ### Building
 
 ```bash
-# Build the Zig project
+# Build for all platforms (Linux, macOS, Windows)
+./scripts/build-all-platforms.sh
+
+# Or build for current platform only
 zig build
 
-# Output: zig-out/bin/mopc
+# Outputs: zig-out/bin/{platform}/mopc[.exe]
 ```
 
 ### Testing Wrapper
@@ -244,8 +260,11 @@ zig-out/bin/mopc test-config /path/to/project
 
 ### Requirements
 
-- Zig (for building mopc binary)
-- jq (for JSON parsing in bash scripts)
+**For End Users (plugin installation):**
+- None! Pre-compiled binaries included for all platforms
+
+**For Development:**
+- Zig 0.13.0+ (for building/modifying mopc binary)
 
 ## Plugin Conventions
 
