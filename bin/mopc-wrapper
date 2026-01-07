@@ -62,4 +62,5 @@ fi
 chmod +x "$MOPC_BIN" 2>/dev/null || true
 
 # Execute the platform-specific binary with all arguments
-exec "$MOPC_BIN" "$@"
+# Call the 'wrapper' subcommand (for bin/claude-diary)
+exec "$MOPC_BIN" wrapper "$@"

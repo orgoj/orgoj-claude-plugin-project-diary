@@ -126,6 +126,8 @@ fn runClaude(
     claude_config: config_mod.ClaudeConfig,
     extra_args: []const []const u8,
 ) !void {
+    const builtin = @import("builtin");
+
     // Build command
     var cmd_args = std.ArrayList([]const u8).init(allocator);
     defer cmd_args.deinit();
@@ -134,40 +136,63 @@ fn runClaude(
     try cmd_args.append("code");
     try cmd_args.appendSlice(extra_args);
 
-    // Build environment map
+    // Build environment map (cross-platform)
     var env_map = std.process.EnvMap.init(allocator);
     defer env_map.deinit();
 
-    // Start with current environment
-    var current_env = try std.process.getEnvMap(allocator);
-    defer current_env.deinit();
+    // Platform-specific environment handling
+    if (builtin.target.os.tag == .windows) {
+        // On Windows, only set configured variables (child inherits rest)
+        // std.process.getEnvMap uses posix.getenv which doesn't work on Windows
+        var env_it = claude_config.env.iterator();
+        while (env_it.next()) |entry| {
+            const key = entry.key_ptr.*;
+            const value = entry.value_ptr.*;
 
-    // Copy current environment
-    var curr_it = current_env.hash_map.iterator();
-    while (curr_it.next()) |entry| {
-        try env_map.put(entry.key_ptr.*, entry.value_ptr.*);
-    }
+            switch (value) {
+                .literal => |v| {
+                    try env_map.put(key, v);
+                },
+                .reference => |_| {
+                    // Skip references on Windows (can't easily get current env)
+                },
+                .unset => {
+                    // Skip unset on Windows (can't modify inherited env)
+                },
+            }
+        }
+    } else {
+        // On Unix-like systems, copy current environment and apply changes
+        var current_env = try std.process.getEnvMap(allocator);
+        defer current_env.deinit();
 
-    // Apply config environment variables
-    var env_it = claude_config.env.iterator();
-    while (env_it.next()) |entry| {
-        const key = entry.key_ptr.*;
-        const value = entry.value_ptr.*;
+        // Copy current environment
+        var curr_it = current_env.hash_map.iterator();
+        while (curr_it.next()) |entry| {
+            try env_map.put(entry.key_ptr.*, entry.value_ptr.*);
+        }
 
-        switch (value) {
-            .literal => |v| {
-                try env_map.put(key, v);
-            },
-            .reference => |ref| {
-                // Resolve environment variable reference
-                if (current_env.get(ref)) |resolved| {
-                    try env_map.put(key, resolved);
-                }
-            },
-            .unset => {
-                // Remove the variable
-                _ = env_map.remove(key);
-            },
+        // Apply config environment variables
+        var env_it = claude_config.env.iterator();
+        while (env_it.next()) |entry| {
+            const key = entry.key_ptr.*;
+            const value = entry.value_ptr.*;
+
+            switch (value) {
+                .literal => |v| {
+                    try env_map.put(key, v);
+                },
+                .reference => |ref| {
+                    // Resolve environment variable reference
+                    if (current_env.get(ref)) |resolved| {
+                        try env_map.put(key, resolved);
+                    }
+                },
+                .unset => {
+                    // Remove the variable
+                    _ = env_map.remove(key);
+                },
+            }
         }
     }
 

@@ -2,7 +2,7 @@
 zig-cache/
 .zig-cache/
 
-# Zig build artifacts (except platform binaries)
+# Zig build artifacts (except platform binaries for marketplace)
 zig-out/*
 !zig-out/bin/
 zig-out/bin/*
@@ -13,6 +13,9 @@ zig-out/bin/*
 !zig-out/bin/windows-x64/
 !zig-out/bin/**/*.exe
 !zig-out/bin/**/mopc
+
+# Allow platform-specific binaries to be committed for marketplace distribution
+# (Users won't have Zig installed)
 
 # Test artifacts
 /tmp/zig-test/
