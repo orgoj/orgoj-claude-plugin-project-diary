@@ -21,3 +21,7 @@ zig-out/bin/*
 /tmp/zig-test/
 /tmp/mopc-test-*
 tests/fixtures/
+
+# Temporary platform-specific symlink (created by SessionStart hook)
+hooks/mopc
+hooks/mopc.exe

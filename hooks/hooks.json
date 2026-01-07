@@ -3,31 +3,31 @@
     "PreCompact": [{
       "hooks": [{
         "type": "command",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/diary-hook.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" pre-compact"
+        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" hook --project-dir \"${CLAUDE_PROJECT_DIR}\" pre-compact"
       }]
     }],
     "SessionEnd": [{
       "hooks": [{
         "type": "command",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/diary-hook.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" session-end"
+        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" hook --project-dir \"${CLAUDE_PROJECT_DIR}\" session-end"
       }]
     }],
     "SessionStart": [{
       "hooks": [{
         "type": "command",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/diary-hook.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" session-start"
+        "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.js\" --project-dir \"${CLAUDE_PROJECT_DIR}\""
       }]
     }],
     "Stop": [{
       "hooks": [{
         "type": "command",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/time-tracker.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" stop"
+        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" tracker --project-dir \"${CLAUDE_PROJECT_DIR}\" stop"
       }]
     }],
     "UserPromptSubmit": [{
       "hooks": [{
         "type": "command",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/time-tracker.sh\" --project-dir \"${CLAUDE_PROJECT_DIR}\" prompt"
+        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" tracker --project-dir \"${CLAUDE_PROJECT_DIR}\" prompt"
       }]
     }]
   }
