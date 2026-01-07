@@ -13,6 +13,9 @@ zig-out/bin/*
 !zig-out/bin/windows-x64/
 !zig-out/bin/**/*.exe
 !zig-out/bin/**/mopc
+# Ignore dev build (not platform-specific)
+zig-out/bin/mopc
+zig-out/bin/mopc.exe
 
 # Allow platform-specific binaries to be committed for marketplace distribution
 # (Users won't have Zig installed)

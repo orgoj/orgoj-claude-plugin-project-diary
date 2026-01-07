@@ -33,13 +33,23 @@ const ext = os === 'windows' ? '.exe' : '';
 
 // Paths
 const pluginRoot = path.resolve(__dirname, '..');
-const sourceBin = path.join(pluginRoot, 'zig-out', 'bin', platform, `mopc${ext}`);
 const targetBin = path.join(pluginRoot, 'hooks', `mopc${ext}`);
 
-// Check if source binary exists
-if (!fs.existsSync(sourceBin)) {
-  console.error(`Error: mopc binary not found for platform ${platform}`);
-  console.error(`Expected: ${sourceBin}`);
+// Prefer dev build (zig-out/bin/mopc) if exists, otherwise use platform-specific
+const devBin = path.join(pluginRoot, 'zig-out', 'bin', `mopc${ext}`);
+const prodBin = path.join(pluginRoot, 'zig-out', 'bin', platform, `mopc${ext}`);
+
+let sourceBin;
+if (fs.existsSync(devBin)) {
+  // Development mode - use direct build output
+  sourceBin = devBin;
+} else if (fs.existsSync(prodBin)) {
+  // Production/marketplace mode - use platform-specific binary
+  sourceBin = prodBin;
+} else {
+  console.error(`Error: mopc binary not found`);
+  console.error(`Tried dev: ${devBin}`);
+  console.error(`Tried prod: ${prodBin}`);
   process.exit(1);
 }
 
