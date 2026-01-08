@@ -315,10 +315,10 @@ your-project/
 ## Requirements
 
 - Claude Code CLI
-- **Minimal runtime dependencies:**
+- **No additional installations required:**
   - Pre-compiled mopc binaries included for Linux (x64/ARM64), macOS (Intel/Apple Silicon), and Windows
   - Native Zig binary with built-in JSONL parser
-  - Node.js runtime (provided by Claude Code) - required only for SessionStart hook
+  - Node.js runtime bundled with Claude Code (used only for SessionStart hook - no separate installation needed)
   - No Bash, jq, or other external tools needed
 
 ## Credits

@@ -274,6 +274,43 @@ zig-out/bin/mopc test-config /path/to/project
 **For Development:**
 - Zig 0.13.0+ (for building/modifying mopc binary)
 
+### Runtime Dependencies Explained
+
+**Why Node.js for SessionStart Hook:**
+
+The SessionStart hook (`hooks/session-start.js`) is the ONLY component that requires Node.js runtime:
+
+1. **Execution Context:**
+   - SessionStart runs BEFORE any plugin files are set up
+   - At this point, the `hooks/mopc` symlink doesn't exist yet
+   - Cannot use mopc binary for platform detection
+
+2. **What SessionStart Does:**
+   - Detects platform (Linux/macOS/Windows) and architecture (x64/arm64)
+   - Creates `hooks/mopc` symlink pointing to correct platform binary in `zig-out/bin/{platform}/mopc`
+   - Returns `<session-info>` XML for Claude to parse
+
+3. **Node.js Runtime Source:**
+   - Claude Code includes **bundled Node.js runtime** in installation
+   - When hook executes `node hooks/session-start.js`, it uses Claude Code's internal Node.js
+   - **Users DO NOT need to install Node.js separately**
+   - The bundled runtime is isolated from system Node.js
+
+4. **Bun Compatibility:**
+   - If user has Bun installed, Claude Code can use it as Node.js replacement
+   - Bun is Node.js-compatible and can run session-start.js
+   - This is optional - Claude Code's bundled Node.js is sufficient
+
+5. **Why Not Zig for SessionStart:**
+   - Would require separate Zig binary for platform detection
+   - Node.js is already available in Claude Code (zero additional dependencies for users)
+   - Simpler to maintain single-file JavaScript for this bootstrap task
+
+**All Other Hooks:**
+- Use mopc binary directly via symlink (after SessionStart creates it)
+- Pure Zig with zero runtime dependencies
+- No Node.js, Bash, or external tools required
+
 ## Plugin Conventions
 
 - Filename format: `YYYY-MM-DD-HH-MM-SESSIONID.md`
@@ -325,7 +362,7 @@ When introducing incompatible changes to file formats, implement version trackin
 - Keep backward compatibility when possible
 
 **Version Detection:**
-- mopc knows its own version (src/main.zig: `v1.13.0`)
+- mopc knows its own version (src/main.zig: `v1.14.0`)
 - Compare mopc version with file version
 - Warn if file version > mopc version (newer format)
 - Migrate if file version < mopc version (older format)
