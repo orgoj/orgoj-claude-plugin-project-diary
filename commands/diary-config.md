@@ -149,7 +149,7 @@ Activity score = prompts + toolCalls + filesModified + todos
 ## Notes
 
 - If user selects "Other", ask for custom numeric value
-- Config affects `recovery-generator.js` hook behavior
+- Config affects recovery generation by PreCompact and SessionEnd hooks (via `mopc recovery`)
 - Sessions with activity below minActivity won't generate recovery files
 - Idle time detection requires `idleTime.enabled: true` to function
 - When enabled, tracks time between Stop hooks and notifies on new prompts if idle exceeds threshold

@@ -23,6 +23,20 @@ All notable changes to this project will be documented in this file.
   - Previously: `mopc debug enable` saved config but hooks never loaded it
   - Now: Debug logging works when enabled, config cascade functions correctly
 - **Version sync**: plugin.json updated to match main.zig (1.14.0)
+- **Improved error messages** in recovery.zig with better context for debugging
+  - JSON parse errors now show input source (stdin/hook) and length
+  - Missing field errors now list available fields
+
+### Documentation
+- **Fixed CLAUDE.md architecture diagram** - now matches actual implementation
+  - Removed references to non-existent bash wrapper scripts
+  - Shows actual symlink structure: `bin/mopc` and `hooks/mopc` → `zig-out/bin/mopc`
+  - Documents `hooks/session-start.js` (Node.js requirement)
+- **Clarified Node.js dependency** in README and CLAUDE.md
+  - SessionStart hook requires Node.js runtime (provided by Claude Code)
+  - Compatible with Bun as Node.js replacement
+  - Updated "zero dependencies" claim to "minimal dependencies"
+- **Fixed diary-config.md** - corrected reference from `recovery-generator.js` to `mopc recovery`
 
 ### Technical Details
 ```json

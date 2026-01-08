@@ -8,17 +8,16 @@ A Claude Code plugin that provides project-local session diaries with automatic 
 
 ## Architecture
 
-**Master of Prompts (mopc)** - Single cross-platform Zig binary with zero runtime dependencies.
+**Master of Prompts (mopc)** - Single cross-platform Zig binary with zero runtime dependencies (except SessionStart hook which requires Node.js runtime provided by Claude Code).
 
 ```
 bin/
-├── claude-diary         # Symlink to mopc-wrapper
-└── mopc-wrapper         # Platform detection wrapper (bash) - selects correct binary
+└── mopc                 # Symlink to zig-out/bin/mopc (for direct CLI usage)
 
 hooks/
 ├── hooks.json           # Hook definitions (SessionStart, PreCompact, SessionEnd, Stop, UserPromptSubmit)
-├── diary-hook.sh        # Symlink to mopc-wrapper
-└── time-tracker.sh      # Symlink to mopc-wrapper
+├── mopc                 # Symlink to zig-out/bin/mopc (used by hooks)
+└── session-start.js     # Node.js script for SessionStart hook (platform detection & setup)
 
 zig-out/bin/             # Pre-compiled binaries for all platforms
 ├── linux-x64/mopc
@@ -28,15 +27,18 @@ zig-out/bin/             # Pre-compiled binaries for all platforms
 └── windows-x64/mopc.exe
 
 src/
-├── main.zig             # Main entry point - command dispatcher with argv[0] detection
+├── main.zig             # Main entry point - command dispatcher
 ├── commands/
 │   ├── recovery.zig     # Native JSONL transcript parser - generates recovery markdown
 │   ├── hook.zig         # Hook handler - session-start, pre-compact, session-end
 │   ├── tracker.zig      # Time tracker - stop, prompt events
-│   └── wrapper.zig      # Wrapper implementation
+│   ├── wrapper.zig      # Wrapper implementation (bin/claude-diary)
+│   ├── debug.zig        # Debug CLI - enable/disable/view/clear
+│   └── debug_hook.zig   # Catch-all hook handler for debug logging
 └── shared/
     ├── config.zig       # Configuration loading with cascade
-    └── paths.zig        # Path utilities
+    ├── paths.zig        # Path utilities
+    └── debug.zig        # Debug logging module
 
 scripts/
 └── build-all-platforms.sh  # Cross-compile for all platforms
@@ -46,6 +48,12 @@ commands/
 ├── diary-config.md      # /diary-config skill - configure recovery settings
 └── reflect.md           # /reflect skill - pattern analysis and CLAUDE.md updates
 ```
+
+**Note on SessionStart Hook:**
+- SessionStart hook MUST use Node.js (session-start.js) because it runs before mopc symlink exists
+- Creates the `hooks/mopc` symlink pointing to correct platform binary
+- Claude Code provides Node.js runtime (compatible with Bun if used as Node.js replacement)
+- All other hooks use the mopc binary directly via symlink
 
 ### Data Flow
 

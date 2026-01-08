@@ -2,7 +2,7 @@
 
 A Claude Code plugin for project-local session diaries with reflection to CLAUDE.md.
 
-**Powered by mopc (Master of Prompts)** - a cross-platform Zig binary with zero runtime dependencies.
+**Powered by mopc (Master of Prompts)** - a cross-platform Zig binary with minimal dependencies (SessionStart hook requires Node.js runtime provided by Claude Code).
 
 ## Features
 
@@ -315,10 +315,11 @@ your-project/
 ## Requirements
 
 - Claude Code CLI
-- **No runtime dependencies required!**
-  - Pre-compiled binaries included for Linux (x64/ARM64), macOS (Intel/Apple Silicon), and Windows
+- **Minimal runtime dependencies:**
+  - Pre-compiled mopc binaries included for Linux (x64/ARM64), macOS (Intel/Apple Silicon), and Windows
   - Native Zig binary with built-in JSONL parser
-  - No Node.js, Bash, or jq needed
+  - Node.js runtime (provided by Claude Code) - required only for SessionStart hook
+  - No Bash, jq, or other external tools needed
 
 ## Credits
 

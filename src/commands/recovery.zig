@@ -567,7 +567,8 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
         json_input,
         .{ .ignore_unknown_fields = true },
     ) catch {
-        std.debug.print("Error: Invalid JSON input\n", .{});
+        std.debug.print("Error: Invalid JSON input from stdin (hook input)\n", .{});
+        std.debug.print("Input length: {d} bytes\n", .{json_input.len});
         return error.InvalidInput;
     };
     defer parsed.deinit();
@@ -576,7 +577,13 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     // Extract required fields
     const transcript_path_value = input.get("transcript_path") orelse {
-        std.debug.print("Error: No transcript_path in input\n", .{});
+        std.debug.print("Error: No transcript_path field in hook input JSON\n", .{});
+        std.debug.print("Available fields: ", .{});
+        var it = input.iterator();
+        while (it.next()) |entry| {
+            std.debug.print("{s} ", .{entry.key_ptr.*});
+        }
+        std.debug.print("\n", .{});
         return error.MissingField;
     };
     const transcript_path = transcript_path_value.string;
