@@ -273,6 +273,55 @@ zig-out/bin/mopc test-config /path/to/project
 - Hook outputs use XML tags (`<session-info>`, `<recovery-context>`) for parsing
 - Wrapper generates 8-char session IDs and creates temporary `.claude/settings.local.json` for permissions
 
+## Version Tracking & Migration Strategy
+
+**Current Status:** No version tracking in files (pre-1.0)
+
+**Future Strategy (when making breaking changes):**
+
+When introducing incompatible changes to file formats, implement version tracking:
+
+1. **Config Files** (`.claude/diary/.config.json`):
+   ```json
+   {
+     "version": "2.0.0",
+     "recovery": {...},
+     "debug": {...}
+   }
+   ```
+   - mopc reads `version` field
+   - If missing or old: automatic migration or warning
+   - Migration function: `config.migrate(from_version, to_version)`
+
+2. **Recovery Files** (`.claude/diary/recovery/*.md`):
+   ```markdown
+   <!-- mopc-version: 2.0.0 -->
+   # Session Recovery
+   ...
+   ```
+   - Add version comment at top of file
+   - mopc checks version when loading recovery
+   - Old format: continue working or show migration notice
+
+3. **Debug Log** (`.claude/diary/debug/hooks.jsonl`):
+   ```json
+   {"version":"2.0.0","timestamp":...}
+   ```
+   - Each log entry includes version
+   - Backward compatible parsing (skip unknown fields)
+
+**Implementation Guidelines:**
+- Add version tracking ONLY when introducing breaking changes
+- Provide migration path or clear error messages
+- Document version changes in CHANGELOG.md
+- Keep backward compatibility when possible
+
+**Version Detection:**
+- mopc knows its own version (src/main.zig: `v1.13.0`)
+- Compare mopc version with file version
+- Warn if file version > mopc version (newer format)
+- Migrate if file version < mopc version (older format)
+
 ## User Preferences
 
 - version: bump + CHANGELOG update must be in same commit as feature
@@ -282,3 +331,46 @@ zig-out/bin/mopc test-config /path/to/project
 - commits: conventional format (feat:, fix:, chore:) with English messages
 - push: wait for explicit user confirmation before pushing
 - worktrees: do NOT use git worktrees for this project - work directly on master
+
+## Feature Completion Checklist
+
+After implementing any major feature (non-trivial change that affects user-facing functionality), complete ALL steps in a SINGLE commit:
+
+1. **Version Bump** (`src/main.zig`)
+   - Increment version appropriately (major.minor.patch)
+   - Major: Breaking changes or significant new features
+   - Minor: New features, significant improvements
+   - Patch: Bug fixes, small improvements
+
+2. **CHANGELOG.md Update**
+   - Add new version section at the top with current date
+   - Categorize changes: Added, Changed, Fixed, Removed
+   - Include usage examples for new features
+   - Be specific about what changed and why
+
+3. **README.md Update**
+   - Add/update feature documentation
+   - Include usage examples and configuration
+   - Update command list if new commands added
+   - Update feature list in introduction if applicable
+
+4. **Commit Message**
+   - Use conventional format: `feat:`, `fix:`, `chore:`
+   - Include detailed description in commit body
+   - Reference what was implemented
+
+5. **Push**
+   - Wait for explicit user confirmation before pushing
+
+**Example commit structure:**
+```
+feat: implement comprehensive hook debug logging system
+
+Added two-level debug logging for hook execution:
+[detailed description...]
+
+Changes:
+- Version: 1.12.0 → 1.13.0
+- Updated CHANGELOG.md with v1.13.0 section
+- Updated README.md with Debug Logging section
+```

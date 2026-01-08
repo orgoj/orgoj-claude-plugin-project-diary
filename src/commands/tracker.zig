@@ -1,8 +1,10 @@
 const std = @import("std");
 const paths = @import("../shared/paths.zig");
 const config_mod = @import("../shared/config.zig");
+const debug_mod = @import("../shared/debug.zig");
 
 pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
+    const start_time = std.time.milliTimestamp();
     // Parse arguments
     var project_dir: ?[]const u8 = null;
     var subcommand: ?[]const u8 = null;
@@ -72,10 +74,66 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     );
     defer allocator.free(timestamp_file);
 
-    if (std.mem.eql(u8, subcommand.?, "stop")) {
+    // Load config to check debug status
+    var config = config_mod.loadCascadedConfig(allocator, project_dir.?) catch blk: {
+        break :blk try config_mod.Config.init(allocator);
+    };
+    defer config.deinit();
+
+    // Capture output for debug logging
+    var output_buf = std.ArrayList(u8).init(allocator);
+    defer output_buf.deinit();
+
+    var error_msg: ?[]const u8 = null;
+    defer if (error_msg) |e| allocator.free(e);
+
+    // Execute tracker command
+    const result = runTrackerInternal(allocator, &output_buf, subcommand.?, timestamp_file, &config) catch |err| blk: {
+        const err_str = try std.fmt.allocPrint(allocator, "{}", .{err});
+        error_msg = err_str;
+        break :blk err;
+    };
+
+    // Write output to stdout
+    if (output_buf.items.len > 0) {
+        const stdout = std.io.getStdOut().writer();
+        try stdout.writeAll(output_buf.items);
+    }
+
+    // Log if debug enabled
+    if (debug_mod.shouldLogOurHooks(config)) {
+        const end_time = std.time.milliTimestamp();
+        const duration: u64 = @intCast(end_time - start_time);
+
+        var entry = try debug_mod.createEntry(
+            allocator,
+            subcommand.?,
+            session_id,
+            input,
+            args,
+            output_buf.items,
+            duration,
+            error_msg,
+        );
+        defer entry.deinit();
+
+        debug_mod.logHook(allocator, project_dir.?, entry) catch {};
+    }
+
+    return result;
+}
+
+fn runTrackerInternal(
+    allocator: std.mem.Allocator,
+    output_buf: *std.ArrayList(u8),
+    subcommand: []const u8,
+    timestamp_file: []const u8,
+    config: *const config_mod.Config,
+) !void {
+    if (std.mem.eql(u8, subcommand, "stop")) {
         try handleStop(timestamp_file);
-    } else if (std.mem.eql(u8, subcommand.?, "prompt")) {
-        try handlePrompt(allocator, project_dir.?, timestamp_file);
+    } else if (std.mem.eql(u8, subcommand, "prompt")) {
+        try handlePromptInternal(allocator, output_buf, timestamp_file, config);
     }
 }
 
@@ -90,27 +148,9 @@ fn handleStop(timestamp_file: []const u8) !void {
     try file.writeAll(timestamp_str);
 }
 
-fn handlePrompt(allocator: std.mem.Allocator, project_dir: []const u8, timestamp_file: []const u8) !void {
-    // Load config
-    const config_path = try paths.getConfigPath(allocator, project_dir);
-    defer allocator.free(config_path);
-
-    var config = config_mod.load(allocator, config_path) catch |err| {
-        // If config can't be loaded, use defaults
-        if (err == error.FileNotFound) {
-            var default_config = try config_mod.Config.init(allocator);
-            defer default_config.deinit();
-            return handlePromptWithConfig(allocator, timestamp_file, &default_config);
-        }
-        return err;
-    };
-    defer config.deinit();
-
-    try handlePromptWithConfig(allocator, timestamp_file, &config);
-}
-
-fn handlePromptWithConfig(
+fn handlePromptInternal(
     allocator: std.mem.Allocator,
+    output_buf: *std.ArrayList(u8),
     timestamp_file: []const u8,
     config: *const config_mod.Config,
 ) !void {
@@ -143,7 +183,7 @@ fn handlePromptWithConfig(
 
     // Check threshold
     if (elapsed_minutes >= config.idleTime.thresholdMinutes) {
-        const stdout = std.io.getStdOut().writer();
+        const writer = output_buf.writer();
 
         // Create message
         const message = try std.fmt.allocPrint(
@@ -169,7 +209,7 @@ fn handlePromptWithConfig(
         };
 
         // Serialize to JSON
-        try std.json.stringify(output, .{}, stdout);
-        try stdout.writeByte('\n');
+        try std.json.stringify(output, .{}, writer);
+        try writer.writeByte('\n');
     }
 }

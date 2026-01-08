@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.13.0] - 2026-01-08
+
+### Added
+- **Two-level debug logging system** for comprehensive hook debugging
+- **Debug CLI commands**: `mopc debug enable/disable/view/clear`
+- **Level 1 logging (debug.logOurHooks)**: Logs our implemented hooks (SessionStart, PreCompact, SessionEnd, Stop, UserPromptSubmit)
+  - Captures: timestamp, stdin, argv, environment, output, duration, errors
+  - Integrated into hook.zig and tracker.zig
+- **Level 2 logging (debug.logAllHooks)**: Catch-all handler for ALL Claude Code hook events
+  - Logs: PostToolUse, PreToolUse, PreAssistantMessage, PostAssistantMessage
+  - Plus all our hooks for complete system visibility
+- **JSONL log format** at `.claude/diary/debug/hooks.jsonl`
+- **Debug module** (src/shared/debug.zig): HookLogEntry struct and JSONL logger
+- **Catch-all hook handler** (src/commands/debug_hook.zig): Logs all system hooks when enabled
+- **Config cascade support** for debug settings (home → workspace → project)
+- Debug settings default to **disabled** (opt-in for privacy)
+
+### Usage
+```bash
+mopc debug enable --our-hooks     # Log our hooks only
+mopc debug enable --all-hooks     # Log everything (complete debugging)
+mopc debug view --tail 100        # View last 100 log entries
+mopc debug disable                # Turn off logging
+mopc debug clear                  # Clear log file
+```
+
 ## [1.12.0] - 2026-01-06
 
 ### Added

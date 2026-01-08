@@ -47,10 +47,55 @@ export PATH="/path/to/plugin/bin:$PATH"
 ```bash
 mopc --version                    # Show version
 mopc wrapper [OPTIONS]            # Run wrapper with diary management
+mopc debug [enable|disable|view|clear] # Debug hook execution
 mopc test-config /path            # Test config cascade
 mopc recovery                     # Generate recovery manually
 mopc hook session-start           # Hook commands (used internally)
 mopc tracker stop                 # Time tracking commands
+```
+
+### Debug Logging
+
+Debug hook execution with comprehensive logging to JSONL format:
+
+```bash
+# Enable debug logging for our hooks only
+mopc debug enable --our-hooks
+
+# Enable debug logging for ALL hooks (complete system debugging)
+mopc debug enable --all-hooks
+
+# View last 100 log entries
+mopc debug view --tail 100
+
+# Disable debug logging
+mopc debug disable
+
+# Clear log file
+mopc debug clear
+```
+
+**Two-level debugging:**
+
+1. **Our Hooks** (`--our-hooks`): Logs only implemented hooks
+   - SessionStart, PreCompact, SessionEnd, Stop, UserPromptSubmit
+   - Captures: timestamp, stdin, argv, env, output, duration, errors
+
+2. **All Hooks** (`--all-hooks`): Logs everything for complete debugging
+   - Our hooks + PostToolUse, PreToolUse, PreAssistantMessage, PostAssistantMessage
+   - Full system visibility for troubleshooting
+
+**Log location**: `.claude/diary/debug/hooks.jsonl`
+
+**Configuration** (via `/diary-config`):
+```json
+{
+  "debug": {
+    "enabled": false,        // Master switch (default: disabled)
+    "logOurHooks": true,     // Log our implemented hooks
+    "logAllHooks": false     // Log ALL system hooks
+  }
+}
 ```
 
 ### Wrapper Mode (Recommended)

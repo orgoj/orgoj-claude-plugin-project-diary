@@ -71,10 +71,16 @@ pub fn logHook(
     const log_path = try getLogPath(allocator, project_dir);
     defer allocator.free(log_path);
 
-    // Open file in append mode
-    const file = try std.fs.cwd().openFile(log_path, .{
+    // Open or create file in append mode
+    const file = std.fs.cwd().openFile(log_path, .{
         .mode = .write_only,
-    });
+    }) catch |err| blk: {
+        if (err == error.FileNotFound) {
+            // Create the file if it doesn't exist
+            break :blk try std.fs.cwd().createFile(log_path, .{});
+        }
+        return err;
+    };
     defer file.close();
 
     try file.seekFromEnd(0);

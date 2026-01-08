@@ -40,7 +40,7 @@ pub fn main() !void {
 
     // Handle --version flag
     if (args.len >= 2 and (std.mem.eql(u8, args[1], "--version") or std.mem.eql(u8, args[1], "-v"))) {
-        std.debug.print("mopc v0.1.0 - Master of Prompts\n", .{});
+        std.debug.print("mopc v1.13.0 - Master of Prompts\n", .{});
         return;
     }
 
@@ -59,6 +59,12 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, cmd, "test-config")) {
         const test_config = @import("commands/test-config.zig");
         try test_config.run(allocator, cmd_args);
+    } else if (std.mem.eql(u8, cmd, "debug-hook")) {
+        const debug_hook = @import("commands/debug_hook.zig");
+        try debug_hook.run(allocator, cmd_args);
+    } else if (std.mem.eql(u8, cmd, "debug")) {
+        const debug_cmd = @import("commands/debug.zig");
+        try debug_cmd.run(allocator, cmd_args);
     } else {
         std.debug.print("Unknown command: {s}\n\n", .{cmd});
         try printUsage();
@@ -76,6 +82,7 @@ fn printUsage() !void {
         \\  mopc hook [session-start|pre-compact|session-end] [OPTIONS]
         \\  mopc tracker [stop|prompt] [OPTIONS]
         \\  mopc recovery [OPTIONS]
+        \\  mopc debug [enable|disable|view|clear] [OPTIONS]
         \\  mopc test-config [PROJECT_DIR]
         \\  mopc --version
         \\

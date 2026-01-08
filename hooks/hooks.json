@@ -1,33 +1,87 @@
 {
   "hooks": {
     "PreCompact": [{
-      "hooks": [{
-        "type": "command",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" hook --project-dir \"${CLAUDE_PROJECT_DIR}\" pre-compact"
-      }]
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" hook --project-dir \"${CLAUDE_PROJECT_DIR}\" pre-compact"
+        },
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" debug-hook --project-dir \"${CLAUDE_PROJECT_DIR}\" PreCompact"
+        }
+      ]
     }],
     "SessionEnd": [{
-      "hooks": [{
-        "type": "command",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" hook --project-dir \"${CLAUDE_PROJECT_DIR}\" session-end"
-      }]
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" hook --project-dir \"${CLAUDE_PROJECT_DIR}\" session-end"
+        },
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" debug-hook --project-dir \"${CLAUDE_PROJECT_DIR}\" SessionEnd"
+        }
+      ]
     }],
     "SessionStart": [{
-      "hooks": [{
-        "type": "command",
-        "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.js\" --project-dir \"${CLAUDE_PROJECT_DIR}\""
-      }]
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.js\" --project-dir \"${CLAUDE_PROJECT_DIR}\""
+        },
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" debug-hook --project-dir \"${CLAUDE_PROJECT_DIR}\" SessionStart"
+        }
+      ]
     }],
     "Stop": [{
-      "hooks": [{
-        "type": "command",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" tracker --project-dir \"${CLAUDE_PROJECT_DIR}\" stop"
-      }]
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" tracker --project-dir \"${CLAUDE_PROJECT_DIR}\" stop"
+        },
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" debug-hook --project-dir \"${CLAUDE_PROJECT_DIR}\" Stop"
+        }
+      ]
     }],
     "UserPromptSubmit": [{
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" tracker --project-dir \"${CLAUDE_PROJECT_DIR}\" prompt"
+        },
+        {
+          "type": "command",
+          "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" debug-hook --project-dir \"${CLAUDE_PROJECT_DIR}\" UserPromptSubmit"
+        }
+      ]
+    }],
+    "PostToolUse": [{
       "hooks": [{
         "type": "command",
-        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" tracker --project-dir \"${CLAUDE_PROJECT_DIR}\" prompt"
+        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" debug-hook --project-dir \"${CLAUDE_PROJECT_DIR}\" PostToolUse"
+      }]
+    }],
+    "PreToolUse": [{
+      "hooks": [{
+        "type": "command",
+        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" debug-hook --project-dir \"${CLAUDE_PROJECT_DIR}\" PreToolUse"
+      }]
+    }],
+    "PreAssistantMessage": [{
+      "hooks": [{
+        "type": "command",
+        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" debug-hook --project-dir \"${CLAUDE_PROJECT_DIR}\" PreAssistantMessage"
+      }]
+    }],
+    "PostAssistantMessage": [{
+      "hooks": [{
+        "type": "command",
+        "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/mopc\" debug-hook --project-dir \"${CLAUDE_PROJECT_DIR}\" PostAssistantMessage"
       }]
     }]
   }
