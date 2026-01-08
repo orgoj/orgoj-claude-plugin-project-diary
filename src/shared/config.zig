@@ -113,11 +113,18 @@ pub const IdleTimeConfig = struct {
     thresholdMinutes: u32 = 5,
 };
 
+pub const DebugConfig = struct {
+    enabled: bool = false, // Master switch - must be true for any logging
+    logOurHooks: bool = true, // Log our implemented hooks (SessionStart, PreCompact, etc.)
+    logAllHooks: bool = false, // Log ALL hook events (catch-all for debugging)
+};
+
 pub const Config = struct {
     claude: ClaudeConfig,
     wrapper: WrapperConfig = .{},
     recovery: RecoveryConfig = .{},
     idleTime: IdleTimeConfig = .{},
+    debug: DebugConfig = .{},
 
     allocator: std.mem.Allocator,
 
