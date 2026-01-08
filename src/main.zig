@@ -40,7 +40,7 @@ pub fn main() !void {
 
     // Handle --version flag
     if (args.len >= 2 and (std.mem.eql(u8, args[1], "--version") or std.mem.eql(u8, args[1], "-v"))) {
-        std.debug.print("mopc v1.13.0 - Master of Prompts\n", .{});
+        std.debug.print("mopc v1.14.0 - Master of Prompts\n", .{});
         return;
     }
 

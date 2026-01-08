@@ -111,9 +111,14 @@ mopc wrapper -- --model sonnet "fix the bug"
 ```
 
 **What it does:**
-1. **On start**: Checks for unprocessed diaries → offers/auto `/reflect`
-2. **During**: Runs normal Claude session with generated session ID
-3. **On end**: Offers/auto `/diary` in same session (maintains context)
+1. **On start**: Checks for unprocessed diaries → offers/auto `/reflect` (with path-scoped permissions)
+2. **During**: Runs normal Claude session with generated session ID (user confirms all actions)
+3. **On end**: Offers/auto `/diary` (with path-scoped permissions)
+
+**Permissions:**
+- **Main session**: No auto-permissions - user confirms each file operation
+- **`/reflect`**: Auto-allows writes only to `CLAUDE.md` and `.claude/diary/**`
+- **`/diary`**: Auto-allows writes only to `.claude/diary/*.md`
 
 **Configuration** (via `/diary-config`):
 ```json

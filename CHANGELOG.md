@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.14.0] - 2026-01-08
+
+### Changed
+- **Wrapper permissions now path-scoped** - improved security and reduced permission prompts
+  - Main session: No auto-permissions (user confirms each action as needed)
+  - `/reflect`: Restricted to `CLAUDE.md` and `.claude/diary/**` only
+  - `/diary`: Restricted to `.claude/diary/*.md` only
+- Removed global `allowedTools` from wrapper temp settings
+- Temp settings now created per-command with specific path-based permissions
+
+### Security
+- **Reduced permission scope** - wrapper commands can only write to their designated directories
+- Main session requires explicit user approval for all file operations
+
+### Technical Details
+```json
+// /reflect permissions
+{
+  "permissions": {
+    "Write(CLAUDE.md)": "allow",
+    "Write(.claude/diary/reflections/*.md)": "allow",
+    "Write(.claude/diary/processed/*.md)": "allow",
+    "Bash(mv .claude/diary/*.md .claude/diary/processed/*)": "allow",
+    "Bash(mkdir -p .claude/diary/*)": "allow"
+  }
+}
+
+// /diary permissions
+{
+  "permissions": {
+    "Write(.claude/diary/*.md)": "allow",
+    "Bash(mkdir -p .claude/diary)": "allow"
+  }
+}
+```
+
 ## [1.13.0] - 2026-01-08
 
 ### Added

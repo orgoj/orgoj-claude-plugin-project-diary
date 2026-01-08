@@ -41,11 +41,6 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (wrapper_args.auto_diary) |auto| final_config.autoDiary = auto;
     if (wrapper_args.auto_reflect) |auto| final_config.autoReflect = auto;
 
-    // Setup temporary permissions
-    const temp_settings = try setupTempSettings(allocator, project_root);
-    defer allocator.free(temp_settings);
-    defer std.fs.cwd().deleteFile(temp_settings) catch {};
-
     const stdout = std.io.getStdOut().writer();
 
     // Print header
@@ -68,6 +63,11 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
         } else false;
 
         if (run_reflect) {
+            // Setup temp settings with reflect permissions
+            const temp_settings = try setupTempSettings(allocator, project_root, .reflect);
+            defer allocator.free(temp_settings);
+            defer std.fs.cwd().deleteFile(temp_settings) catch {};
+
             var reflect_config = try config_mod.resolveClaudeConfig(allocator, config.claude, config.claude.override.reflect);
             defer reflect_config.deinit();
             try runClaude(allocator, reflect_config, &.{"/reflect"});
@@ -112,6 +112,12 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     if (run_diary) {
         try stdout.writeAll("\n");
+
+        // Setup temp settings with diary permissions
+        const temp_settings = try setupTempSettings(allocator, project_root, .diary);
+        defer allocator.free(temp_settings);
+        defer std.fs.cwd().deleteFile(temp_settings) catch {};
+
         var diary_config = try config_mod.resolveClaudeConfig(allocator, config.claude, config.claude.override.diary);
         defer diary_config.deinit();
         try runClaude(allocator, diary_config, &.{ "--resume", session_id, "/diary" });
@@ -404,29 +410,34 @@ fn findProjectRoot(allocator: std.mem.Allocator) ![]u8 {
     }
 }
 
-fn setupTempSettings(allocator: std.mem.Allocator, project_root: []const u8) ![]u8 {
+const CommandType = enum { reflect, diary };
+
+fn setupTempSettings(allocator: std.mem.Allocator, project_root: []const u8, command_type: CommandType) ![]u8 {
     const settings_path = try std.fs.path.join(allocator, &.{ project_root, ".claude", "settings.local.json" });
 
-    const content =
-        \\{
-        \\  "allowedTools": [
-        \\    "SlashCommand(/diary)",
-        \\    "SlashCommand(/reflect)",
-        \\    "SlashCommand(/diary-config)",
-        \\    "Edit",
-        \\    "Write",
-        \\    "Read",
-        \\    "Glob",
-        \\    "Grep",
-        \\    "Bash(git *)",
-        \\    "Bash(jq *)",
-        \\    "Bash(find *)",
-        \\    "Bash(mkdir *)",
-        \\    "Bash(cat *)"
-        \\  ]
-        \\}
-        \\
-    ;
+    const content = switch (command_type) {
+        .reflect =>
+            \\{
+            \\  "permissions": {
+            \\    "Write(CLAUDE.md)": "allow",
+            \\    "Write(.claude/diary/reflections/*.md)": "allow",
+            \\    "Write(.claude/diary/processed/*.md)": "allow",
+            \\    "Bash(mv .claude/diary/*.md .claude/diary/processed/*)": "allow",
+            \\    "Bash(mkdir -p .claude/diary/*)": "allow"
+            \\  }
+            \\}
+            \\
+        ,
+        .diary =>
+            \\{
+            \\  "permissions": {
+            \\    "Write(.claude/diary/*.md)": "allow",
+            \\    "Bash(mkdir -p .claude/diary)": "allow"
+            \\  }
+            \\}
+            \\
+        ,
+    };
 
     const file = try std.fs.cwd().createFile(settings_path, .{});
     defer file.close();
