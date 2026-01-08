@@ -274,6 +274,14 @@ zig-out/bin/mopc test-config /path/to/project
 **For Development:**
 - Zig 0.13.0+ (for building/modifying mopc binary)
 
+**Zig Version Notes:**
+- **Current:** Zig 0.13.0 (stable, tested, working)
+- **Upgrade Attempts:** Zig 0.14.1 and 0.15.2 tested - both crash with "TODO" panic during compilation
+- **Known Issues:** Upstream Zig bug causing compiler crashes in 0.14+ versions
+- **API Changes in 0.14+:** `std.fs.MAX_PATH_BYTES` deprecated → `std.fs.max_path_bytes` (lowercase)
+- **Decision:** Stay on Zig 0.13.0 until upstream bugs are resolved
+- **Do NOT attempt upgrade** to 0.14+ until these issues are fixed in future Zig releases
+
 ### Runtime Dependencies Explained
 
 **Why Node.js for SessionStart Hook:**
