@@ -198,6 +198,9 @@ pub fn mergeConfigs(allocator: std.mem.Allocator, home: Config, project: Config)
     // Merge idle time config field-by-field
     result.idleTime = mergeIdleTimeConfig(home.idleTime, project.idleTime);
 
+    // Merge debug config field-by-field
+    result.debug = mergeDebugConfig(home.debug, project.debug);
+
     return result;
 }
 
@@ -241,6 +244,16 @@ fn mergeIdleTimeConfig(home: IdleTimeConfig, project: IdleTimeConfig) IdleTimeCo
     return .{
         .enabled = if (project.enabled != defaults.enabled) project.enabled else home.enabled,
         .thresholdMinutes = if (project.thresholdMinutes != defaults.thresholdMinutes) project.thresholdMinutes else home.thresholdMinutes,
+    };
+}
+
+/// Merge two DebugConfig structs - uses non-default values from project, otherwise home
+fn mergeDebugConfig(home: DebugConfig, project: DebugConfig) DebugConfig {
+    const defaults = DebugConfig{};
+    return .{
+        .enabled = if (project.enabled != defaults.enabled) project.enabled else home.enabled,
+        .logOurHooks = if (project.logOurHooks != defaults.logOurHooks) project.logOurHooks else home.logOurHooks,
+        .logAllHooks = if (project.logAllHooks != defaults.logAllHooks) project.logAllHooks else home.logAllHooks,
     };
 }
 
@@ -492,6 +505,11 @@ fn parseConfig(allocator: std.mem.Allocator, content: []const u8) !Config {
         config.idleTime = try parseIdleTimeConfig(idle_val);
     }
 
+    // Parse debug config (backward compatible)
+    if (root.get("debug")) |debug_val| {
+        config.debug = try parseDebugConfig(debug_val);
+    }
+
     return config;
 }
 
@@ -693,6 +711,26 @@ fn parseIdleTimeConfig(value: std.json.Value) !IdleTimeConfig {
     if (obj.get("thresholdMinutes")) |v| {
         if (v != .integer) return error.InvalidJson;
         config.thresholdMinutes = @intCast(v.integer);
+    }
+
+    return config;
+}
+
+fn parseDebugConfig(value: std.json.Value) !DebugConfig {
+    var config: DebugConfig = .{};
+    const obj = value.object;
+
+    if (obj.get("enabled")) |v| {
+        if (v != .bool) return error.InvalidJson;
+        config.enabled = v.bool;
+    }
+    if (obj.get("logOurHooks")) |v| {
+        if (v != .bool) return error.InvalidJson;
+        config.logOurHooks = v.bool;
+    }
+    if (obj.get("logAllHooks")) |v| {
+        if (v != .bool) return error.InvalidJson;
+        config.logAllHooks = v.bool;
     }
 
     return config;

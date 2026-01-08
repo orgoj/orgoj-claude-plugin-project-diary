@@ -16,6 +16,14 @@ All notable changes to this project will be documented in this file.
 - **Reduced permission scope** - wrapper commands can only write to their designated directories
 - Main session requires explicit user approval for all file operations
 
+### Fixed
+- **CRITICAL: Debug logging feature now works** - config parsing was missing
+  - `parseConfig()` now reads "debug" section from JSON files
+  - `mergeConfigs()` now properly merges debug settings in config cascade
+  - Previously: `mopc debug enable` saved config but hooks never loaded it
+  - Now: Debug logging works when enabled, config cascade functions correctly
+- **Version sync**: plugin.json updated to match main.zig (1.14.0)
+
 ### Technical Details
 ```json
 // /reflect permissions
